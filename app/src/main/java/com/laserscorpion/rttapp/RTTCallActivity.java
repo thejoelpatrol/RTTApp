@@ -1,20 +1,14 @@
 package com.laserscorpion.rttapp;
 
-import android.app.Activity;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
-import android.support.design.widget.FloatingActionButton;
-import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.View;
 
-import com.laserscorpion.rttapp.R;
-import android.app.Activity;
-import android.net.sip.SipManager;
 import android.widget.EditText;
 import android.widget.TextView;
 
@@ -26,7 +20,7 @@ public class RTTCallActivity extends AppCompatActivity {
     protected SipRTTCall call = null;
     protected SipRTTManager sipManager;
     protected RTTIncomingCallReceiver callReceiver;
-    private RTTClient texter;
+    private SipClient texter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -79,7 +73,7 @@ public class RTTCallActivity extends AppCompatActivity {
 
     private void resetTexter() {
         try {
-            texter = new RTTClient(this, sipManager, getUsername(), getRegistrar(), getPassword());
+            texter = new SipClient(this, sipManager, getUsername(), getRegistrar(), getPassword());
         } catch (java.text.ParseException e) {
             // TODO throw up a dialog about unable to parse username/server
             Log.e(TAG, "Unable to parse username/server");
