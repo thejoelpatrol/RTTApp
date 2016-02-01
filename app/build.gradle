@@ -25,4 +25,5 @@ dependencies {
     compile 'com.android.support:appcompat-v7:23.1.1'
     compile 'com.android.support:design:23.1.1'
     compile files('libs/android-sip-stack.jar')
+    compile files('libs/log4j-1.2.8.jar')
 }

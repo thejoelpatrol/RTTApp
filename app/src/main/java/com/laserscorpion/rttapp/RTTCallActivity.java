@@ -2,6 +2,7 @@ package com.laserscorpion.rttapp;
 
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.net.sip.SipException;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.support.v7.app.AppCompatActivity;
@@ -11,6 +12,8 @@ import android.view.View;
 
 import android.widget.EditText;
 import android.widget.TextView;
+
+import java.net.SocketException;
 
 public class RTTCallActivity extends AppCompatActivity {
     public static final String TAG = "RTTCallActivity";
@@ -45,9 +48,12 @@ public class RTTCallActivity extends AppCompatActivity {
 
     @Override
     protected void onStop() {
-        texter.unregister();
+        try {
+            texter.unregister();
+        } catch (SipException e) {
+            addText("Failed to unregister: " + e);
+        }
         this.unregisterReceiver(callReceiver);
-        Log.d(TAG, "Unregistering " + getUsername() + '@' + getRegistrar());
         super.onStop();
     }
 
@@ -73,10 +79,13 @@ public class RTTCallActivity extends AppCompatActivity {
 
     private void resetTexter() {
         try {
-            texter = new SipClient(this, sipManager, getUsername(), getRegistrar(), getPassword());
+            texter = new SipClient(this, getUsername(), getRegistrar(), getPassword());
         } catch (java.text.ParseException e) {
             // TODO throw up a dialog about unable to parse username/server
             Log.e(TAG, "Unable to parse username/server");
+        } catch (SocketException e) {
+            // TODO throw up a dialog about unable to connect to internet
+            Log.e(TAG, "Unable to open an internet socket");
         }
     }
 
@@ -91,7 +100,8 @@ public class RTTCallActivity extends AppCompatActivity {
             Log.e(TAG, "SIP exception: " + e.getMessage());
             return;
         }
-        addText("Registered\n");
+        addText("Registering\n");
+        addText(texter.message);
         registerCallReceiver();
     }
 

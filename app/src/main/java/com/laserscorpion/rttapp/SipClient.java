@@ -1,36 +1,35 @@
 package com.laserscorpion.rttapp;
 
-import android.app.PendingIntent;
 import android.content.Context;
-import android.content.Intent;
-//import android.net.sip.SipManager;
-//import android.net.sip.SipProfile;
-//import android.net.sip.SipRegistrationListener;
-import android.gov.nist.javax.sip.header.Contact;
+import android.javax.sip.SipException;
 import android.javax.sip.address.*;
 import android.javax.sip.header.*;
 import android.javax.sip.message.*;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
-import android.os.SystemClock;
+import android.net.sip.*;
+import android.os.AsyncTask;
 import android.util.Log;
 import android.javax.sip.*;
 
-import java.net.DatagramSocket;
+import java.lang.reflect.Constructor;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.Properties;
+import java.util.Random;
+
 
 /**
- * Created by joel on 12/4/15.
+ * This class based on http://alex.bikfalvi.com/teaching/upf/2013/architecture_and_signaling/lab/sip/
  */
-public class SipClient {
-    private android.content.Context parent;
+public class SipClient implements SipListener{
     private static final String TAG = "SipClient";
-    private static final int DEFAULT_PORT = 5060;
-    private static final String DEFAULT_PROTOCOL = "udp";
+    private static final int MAX_FWDS = 70;
+    private static final int DEFAULT_REGISTRATION_LEN = 600;
+    private android.content.Context parent;
     private SipFactory sipFactory;
     private SipStack sipStack;
     private SipProvider sipProvider;
@@ -43,22 +42,25 @@ public class SipClient {
     private String server;
     private String password;
     private String localIP;
-    private int port = DEFAULT_PORT;
-    private String protocol = DEFAULT_PROTOCOL;
+    private int port = ListeningPoint.PORT_5060;
+    private String protocol = ListeningPoint.UDP.toLowerCase();;
     private Address localSipAddress;
+    private Address serverSipAddress;
     private ContactHeader localContactHeader;
-    private DatagramSocket socket;
+    private SipRequester messageSender;
 
-    public SipClient(Context parent, String username, String server, String password) throws java.text.ParseException {
+    public String message;
+
+    public SipClient(Context parent, String username, String server, String password)
+            throws java.text.ParseException, java.net.SocketException {
         this.parent = parent;
         this.username = username;
         this.server = server;
         this.password = password;
-        //createSipProfile();
         finishInit();
     }
 
-    private void finishInit() {
+    private void finishInit() throws java.net.SocketException {
         try {
             findLocalIP();
         } catch (SocketException e) {
@@ -66,29 +68,35 @@ public class SipClient {
             e.printStackTrace();
         }
         sipFactory = SipFactory.getInstance();
-        sipFactory.setPathName("gov.nist");
+        sipFactory.setPathName("android.gov.nist");
         properties = new Properties();
-        properties.setProperty("javax.sip.STACK_NAME", "stack");
-        properties.setProperty("javax.sip.IP_ADDRESS", localIP);
+        properties.setProperty("android.javax.sip.STACK_NAME", "stack");
+        properties.setProperty("android.javax.sip.IP_ADDRESS", localIP);
         try {
-            sipStack = sipFactory.createSipStack(properties);
+            Class[] e = new Class[]{Class.forName("java.util.Properties")};
+            Constructor errmsg1 = Class.forName("android.gov.nist" + ".javax.sip.SipStackImpl").getConstructor(e);
+            Object[] conArgs = new Object[]{properties};
+            sipStack = (SipStack)errmsg1.newInstance(conArgs);
+
+            //sipStack = sipFactory.createSipStack(properties);
             messageFactory = sipFactory.createMessageFactory();
             headerFactory = sipFactory.createHeaderFactory();
             addressFactory = sipFactory.createAddressFactory();
-        } catch (PeerUnavailableException e) {
-            // what the hell is this case? my library is right there in a jar. why would it be anywhere unfindable?
+            listeningPoint = sipStack.createListeningPoint(localIP, port, protocol); // a ListeningPoint is a socket wrapper
+                                                                        // TODO allow different ports if this one is not available
+            sipProvider = sipStack.createSipProvider(listeningPoint);
+            sipProvider.addSipListener(this);
+            messageSender = new SipRequester(sipProvider);
+            localSipAddress = addressFactory.createAddress("sip:" + username + "@" + localIP + ":" + listeningPoint.getPort());
+            serverSipAddress = addressFactory.createAddress("sip:" + username + "@" + server);
+            localContactHeader = headerFactory.createContactHeader(localSipAddress);
+        } catch (Exception e) {
+            // TODO: print some error somehow
+            // there are a ton of exceptions that could occur here, this doesn't seem smart
+            // i just don't even understand why the SIP stack wouldn't support UDP or why it couldn't be found in the first place
+            // maybe more realistically it wouldn't support _TCP_, ok fine
             e.printStackTrace();
         }
-        try {
-            listeningPoint = sipStack.createListeningPoint(localIP, port, protocol);
-        } catch (TransportNotSupportedException e) {
-            // look, this won't happen. what kind of SIP stack would not support UDP?
-            e.printStackTrace();
-        } catch (InvalidArgumentException e) {
-            // TODO: this occurs when the port is invalid. should i just try all of them until i find one? that sucks.
-            e.printStackTrace();
-        }
-
     }
 
     private boolean hasInternetConnection() {
@@ -100,20 +108,89 @@ public class SipClient {
     private void findLocalIP() throws SocketException {
         if (!hasInternetConnection())
             throw new SocketException("no internet connection");
-        Enumeration<NetworkInterface> Interfaces = NetworkInterface.getNetworkInterfaces();
-        localIP = socket.getLocalAddress().getHostAddress();
+        Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+
+        // chooses the first non-localhost IPv4 addr ... is this OK?
+        while (interfaces.hasMoreElements()) {
+            NetworkInterface intfc = interfaces.nextElement();
+            Enumeration<InetAddress> addresses = intfc.getInetAddresses();
+            while (addresses.hasMoreElements()) {
+                InetAddress address = addresses.nextElement();
+                if (isRealIPv4Address(address)) {
+                    /* my belief is that this should be guaranteed to happen once we are sure there
+                       is an internet connection and we have a valid list of interfaces
+                      */
+                    localIP = address.getHostAddress();
+                    return;
+                }
+            }
+        }
     }
 
-    /**
-     * This method basically copied from
-     * https://developer.android.com/guide/topics/connectivity/sip.html#profiles
+    /*
+        This method inspired by https://stackoverflow.com/questions/6064510/how-to-get-ip-address-of-the-device
      */
-    public void register() throws android.net.sip.SipException {
-
+    private boolean isRealIPv4Address(InetAddress address) {
+        String strAddress = address.getHostAddress();
+        if (address.isLoopbackAddress())
+            return false;
+        if (address.isAnyLocalAddress())
+            return false;
+        if (strAddress.contains("dummy"))
+            return false;
+        if (strAddress.contains("%"))
+            return false;
+        if (strAddress.contains(":"))
+            return false;
+        return true;
     }
 
-    public void unregister() {
+    public void register() throws android.net.sip.SipException {
+        doRegister(DEFAULT_REGISTRATION_LEN);
+    }
 
+    private void doRegister(int registrationLength) throws android.net.sip.SipException {
+        int tag = (new Random()).nextInt();
+        URI requestURI = serverSipAddress.getURI();
+
+        try {
+            ArrayList<ViaHeader> viaHeaders = new ArrayList<ViaHeader>();
+            ViaHeader viaHeader = headerFactory.createViaHeader(listeningPoint.getIPAddress(),
+                    listeningPoint.getPort(), protocol, null);
+            viaHeaders.add(viaHeader);
+            MaxForwardsHeader maxForwardsHeader = headerFactory.createMaxForwardsHeader(MAX_FWDS);
+            CallIdHeader callIdHeader = sipProvider.getNewCallId();
+            CSeqHeader cSeqHeader = headerFactory.createCSeqHeader(1L, "REGISTER");
+            FromHeader fromHeader = headerFactory.createFromHeader(serverSipAddress, String.valueOf(tag));
+            ToHeader toHeader = headerFactory.createToHeader(serverSipAddress, null);
+
+            Request request = messageFactory.createRequest(requestURI, "REGISTER", callIdHeader,
+                    cSeqHeader, fromHeader, toHeader, viaHeaders, maxForwardsHeader);
+            request.addHeader(localContactHeader);
+
+            Log.d(TAG, "Sending stateless registration for " + serverSipAddress);
+            message = "Here's the actual request: " + request;
+
+            SipRequester requester = new SipRequester(sipProvider);
+            requester.execute(request);
+            String result = requester.get();
+            Log.d(TAG, "Result: " + result);
+            //new SipRequester(sipProvider).execute(request);
+        } catch (Exception e) {
+            // TODO handle the again-numerous error cases
+            e.printStackTrace();
+        }
+    }
+
+    public void unregister() throws android.net.sip.SipException {
+        try {
+            Log.d(TAG, "re-registering for time 0 ... does this unregister on the server?");
+            doRegister(0);
+            sipStack.deleteListeningPoint(listeningPoint);
+            Log.d(TAG, "deleted listening point");
+        } catch (ObjectInUseException e) {
+            e.printStackTrace();
+        }
     }
 
     public void call(String username) {
@@ -121,4 +198,53 @@ public class SipClient {
     }
 
 
+    @Override
+    public void processRequest(RequestEvent requestEvent) {
+
+    }
+
+    @Override
+    public void processResponse(ResponseEvent responseEvent) {
+        Response response = responseEvent.getResponse();
+        Log.d(TAG, "received a response: " + response.toString());
+    }
+
+    @Override
+    public void processTimeout(TimeoutEvent timeoutEvent) {
+
+    }
+
+    @Override
+    public void processIOException(IOExceptionEvent ioExceptionEvent) {
+
+    }
+
+    @Override
+    public void processTransactionTerminated(TransactionTerminatedEvent transactionTerminatedEvent) {
+
+    }
+
+    @Override
+    public void processDialogTerminated(DialogTerminatedEvent dialogTerminatedEvent) {
+
+    }
+
+    private class SipRequester extends AsyncTask<Request, String, String> {
+        private SipProvider sipProvider;
+
+        public SipRequester(SipProvider provider) {
+            sipProvider = provider;
+        }
+
+        @Override
+        protected String doInBackground(Request... requests) {
+                try {
+                    sipProvider.sendRequest(requests[0]);
+                } catch (SipException e) {
+                    Log.e("BACKGROUND","the request still failed. UGH");
+                    e.printStackTrace();
+                }
+                return null;
+        }
+    }
 }
