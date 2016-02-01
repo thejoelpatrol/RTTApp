@@ -47,7 +47,6 @@ public class SipClient implements SipListener{
     private Address localSipAddress;
     private Address serverSipAddress;
     private ContactHeader localContactHeader;
-    private SipRequester messageSender;
 
     public String message;
 
@@ -86,7 +85,6 @@ public class SipClient implements SipListener{
                                                                         // TODO allow different ports if this one is not available
             sipProvider = sipStack.createSipProvider(listeningPoint);
             sipProvider.addSipListener(this);
-            messageSender = new SipRequester(sipProvider);
             localSipAddress = addressFactory.createAddress("sip:" + username + "@" + localIP + ":" + listeningPoint.getPort());
             serverSipAddress = addressFactory.createAddress("sip:" + username + "@" + server);
             localContactHeader = headerFactory.createContactHeader(localSipAddress);
@@ -163,9 +161,10 @@ public class SipClient implements SipListener{
             CSeqHeader cSeqHeader = headerFactory.createCSeqHeader(1L, "REGISTER");
             FromHeader fromHeader = headerFactory.createFromHeader(serverSipAddress, String.valueOf(tag));
             ToHeader toHeader = headerFactory.createToHeader(serverSipAddress, null);
-
+            ExpiresHeader expiresHeader = headerFactory.createExpiresHeader(registrationLength);
             Request request = messageFactory.createRequest(requestURI, "REGISTER", callIdHeader,
                     cSeqHeader, fromHeader, toHeader, viaHeaders, maxForwardsHeader);
+            request.addHeader(expiresHeader);
             request.addHeader(localContactHeader);
 
             Log.d(TAG, "Sending stateless registration for " + serverSipAddress);
@@ -230,6 +229,7 @@ public class SipClient implements SipListener{
     }
 
     private class SipRequester extends AsyncTask<Request, String, String> {
+        private static final String TAG = "BACKGROUND";
         private SipProvider sipProvider;
 
         public SipRequester(SipProvider provider) {
@@ -238,13 +238,14 @@ public class SipClient implements SipListener{
 
         @Override
         protected String doInBackground(Request... requests) {
-                try {
-                    sipProvider.sendRequest(requests[0]);
-                } catch (SipException e) {
-                    Log.e("BACKGROUND","the request still failed. UGH");
-                    e.printStackTrace();
-                }
-                return null;
+            try {
+                ClientTransaction transaction = sipProvider.getNewClientTransaction(requests[0]);
+                transaction.sendRequest();
+            } catch (SipException e) {
+                Log.e(TAG, "the request still failed. UGH");
+                e.printStackTrace();
+            }
+            return null;
         }
     }
 }
