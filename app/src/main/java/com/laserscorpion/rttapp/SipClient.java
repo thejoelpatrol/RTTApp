@@ -23,9 +23,9 @@ import java.util.Random;
 
 
 /**
- * This class based on http://alex.bikfalvi.com/teaching/upf/2013/architecture_and_signaling/lab/sip/
+ * Some of this class based on http://alex.bikfalvi.com/teaching/upf/2013/architecture_and_signaling/lab/sip/
  */
-public class SipClient implements SipListener{
+public class SipClient implements SipListener {
     private static final String TAG = "SipClient";
     private static final int MAX_FWDS = 70;
     private static final int DEFAULT_REGISTRATION_LEN = 600;
@@ -47,8 +47,9 @@ public class SipClient implements SipListener{
     private Address localSipAddress;
     private Address serverSipAddress;
     private ContactHeader localContactHeader;
-
-    public String message;
+    private ClientTransaction transaction;
+    private String registrationID;
+    private Request origRegistrationRequest;
 
     public SipClient(Context parent, String username, String server, String password)
             throws java.text.ParseException, java.net.SocketException {
@@ -56,6 +57,9 @@ public class SipClient implements SipListener{
         this.username = username;
         this.server = server;
         this.password = password;
+        org.apache.log4j.BasicConfigurator.configure();
+        org.apache.log4j.Logger log = org.apache.log4j.Logger.getRootLogger();
+        log.setLevel(org.apache.log4j.Level.ALL);
         finishInit();
     }
 
@@ -71,13 +75,15 @@ public class SipClient implements SipListener{
         properties = new Properties();
         properties.setProperty("android.javax.sip.STACK_NAME", "stack");
         properties.setProperty("android.javax.sip.IP_ADDRESS", localIP);
+        properties.setProperty("android.javax.sip.REENTRANT_LISTENER", "true");
+        properties.setProperty("android.javax.sip.TRACE_LEVEL", "32");
         try {
-            Class[] e = new Class[]{Class.forName("java.util.Properties")};
+            /*Class[] e = new Class[]{Class.forName("java.util.Properties")};
             Constructor errmsg1 = Class.forName("android.gov.nist" + ".javax.sip.SipStackImpl").getConstructor(e);
             Object[] conArgs = new Object[]{properties};
-            sipStack = (SipStack)errmsg1.newInstance(conArgs);
+            sipStack = (SipStack)errmsg1.newInstance(conArgs);*/
 
-            //sipStack = sipFactory.createSipStack(properties);
+            sipStack = sipFactory.createSipStack(properties);
             messageFactory = sipFactory.createMessageFactory();
             headerFactory = sipFactory.createHeaderFactory();
             addressFactory = sipFactory.createAddressFactory();
@@ -108,15 +114,15 @@ public class SipClient implements SipListener{
             throw new SocketException("no internet connection");
         Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
 
-        // chooses the first non-localhost IPv4 addr ... is this OK?
+        // chooses the first non-localhost IPv4 addr ... this may not be ideal
         while (interfaces.hasMoreElements()) {
             NetworkInterface intfc = interfaces.nextElement();
             Enumeration<InetAddress> addresses = intfc.getInetAddresses();
             while (addresses.hasMoreElements()) {
                 InetAddress address = addresses.nextElement();
                 if (isRealIPv4Address(address)) {
-                    /* my belief is that this should be guaranteed to happen once we are sure there
-                       is an internet connection and we have a valid list of interfaces
+                    /* my understanding is that this should be guaranteed to succeed at least once if 
+                       we are sure there is an internet connection and we have a valid list of interfaces
                       */
                     localIP = address.getHostAddress();
                     return;
@@ -157,8 +163,16 @@ public class SipClient implements SipListener{
                     listeningPoint.getPort(), protocol, null);
             viaHeaders.add(viaHeader);
             MaxForwardsHeader maxForwardsHeader = headerFactory.createMaxForwardsHeader(MAX_FWDS);
+            
             CallIdHeader callIdHeader = sipProvider.getNewCallId();
             CSeqHeader cSeqHeader = headerFactory.createCSeqHeader(1L, "REGISTER");
+            if (registrationLength == 0) {
+                cSeqHeader.setSeqNumber(2L);
+                callIdHeader.setCallId(registrationID);
+            }
+            else
+                registrationID = callIdHeader.getCallId();
+            
             FromHeader fromHeader = headerFactory.createFromHeader(serverSipAddress, String.valueOf(tag));
             ToHeader toHeader = headerFactory.createToHeader(serverSipAddress, null);
             ExpiresHeader expiresHeader = headerFactory.createExpiresHeader(registrationLength);
@@ -167,29 +181,38 @@ public class SipClient implements SipListener{
             request.addHeader(expiresHeader);
             request.addHeader(localContactHeader);
 
-            Log.d(TAG, "Sending stateless registration for " + serverSipAddress);
-            message = "Here's the actual request: " + request;
+            Log.d(TAG, "Sending stateful registration for " + serverSipAddress);
 
+            transaction = sipProvider.getNewClientTransaction(request);
             SipRequester requester = new SipRequester(sipProvider);
-            requester.execute(request);
-            String result = requester.get();
-            Log.d(TAG, "Result: " + result);
-            //new SipRequester(sipProvider).execute(request);
+            requester.execute(transaction);
+            requester.get(); // wait for the request to send, but not for its response
         } catch (Exception e) {
             // TODO handle the again-numerous error cases
             e.printStackTrace();
         }
     }
 
+    // should use the same call ID as the original register, and increment the CSeq
     public void unregister() throws android.net.sip.SipException {
         try {
-            Log.d(TAG, "re-registering for time 0 ... does this unregister on the server?");
+            Log.d(TAG, "re-registering for time 0");
             doRegister(0);
+            //sipProvider.removeSipListener(this);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void close() {
+        try {
+            sipProvider.removeListeningPoint(listeningPoint);
             sipStack.deleteListeningPoint(listeningPoint);
             Log.d(TAG, "deleted listening point");
         } catch (ObjectInUseException e) {
             e.printStackTrace();
         }
+        //sipProvider.removeSipListener(this);
     }
 
     public void call(String username) {
@@ -199,36 +222,40 @@ public class SipClient implements SipListener{
 
     @Override
     public void processRequest(RequestEvent requestEvent) {
-
+        Request request = requestEvent.getRequest();
+        Log.d(TAG, "received a request: ");
+        Log.d(TAG, request.toString().substring(0,100));
     }
 
     @Override
     public void processResponse(ResponseEvent responseEvent) {
         Response response = responseEvent.getResponse();
-        Log.d(TAG, "received a response: " + response.toString());
+        Log.d(TAG, "received a response: ");
+        Log.d(TAG, response.toString().substring(0,100));
+        
     }
 
     @Override
     public void processTimeout(TimeoutEvent timeoutEvent) {
-
+        Log.d(TAG, "received a Timeout message");
     }
 
     @Override
     public void processIOException(IOExceptionEvent ioExceptionEvent) {
-
+        Log.d(TAG, "received a IOException message: " + ioExceptionEvent.toString());
     }
 
     @Override
     public void processTransactionTerminated(TransactionTerminatedEvent transactionTerminatedEvent) {
-
+        Log.d(TAG, "received a TransactionTerminated message: " + transactionTerminatedEvent.toString());
     }
 
     @Override
     public void processDialogTerminated(DialogTerminatedEvent dialogTerminatedEvent) {
-
+        Log.d(TAG, "received a DialogTerminated message");
     }
 
-    private class SipRequester extends AsyncTask<Request, String, String> {
+    private class SipRequester extends AsyncTask<ClientTransaction, String, String> {
         private static final String TAG = "BACKGROUND";
         private SipProvider sipProvider;
 
@@ -237,15 +264,19 @@ public class SipClient implements SipListener{
         }
 
         @Override
-        protected String doInBackground(Request... requests) {
+        protected String doInBackground(ClientTransaction... transactions) {
             try {
-                ClientTransaction transaction = sipProvider.getNewClientTransaction(requests[0]);
-                transaction.sendRequest();
+                transactions[0].sendRequest();
+                try {
+                    Thread.sleep(1000,0);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
             } catch (SipException e) {
                 Log.e(TAG, "the request still failed. UGH");
                 e.printStackTrace();
             }
-            return null;
+            return transactions[0].getState().toString();
         }
     }
 }

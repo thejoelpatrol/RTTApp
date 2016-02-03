@@ -2,7 +2,9 @@ package com.laserscorpion.rttapp;
 
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.javax.sip.SipListener;
 import android.net.sip.SipException;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.support.v7.app.AppCompatActivity;
@@ -50,6 +52,7 @@ public class RTTCallActivity extends AppCompatActivity {
     protected void onStop() {
         try {
             texter.unregister();
+            texter.close();
         } catch (SipException e) {
             addText("Failed to unregister: " + e);
         }
@@ -94,14 +97,15 @@ public class RTTCallActivity extends AppCompatActivity {
      */
     private void register() {
         try {
+            addText("Registering...\n");
             texter.register();
+            addText("Registered with server.");
         } catch (android.net.sip.SipException e) {
             // TODO send up a dialog or something
-            Log.e(TAG, "SIP exception: " + e.getMessage());
+            addText("Failed to register with server: " + e.getMessage());
             return;
         }
-        addText("Registering\n");
-        addText(texter.message);
+        
         registerCallReceiver();
     }
 
