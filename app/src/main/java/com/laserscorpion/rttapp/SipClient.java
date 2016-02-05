@@ -19,6 +19,7 @@ import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.Socket;
 import java.net.SocketException;
+import java.security.SecureRandom;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Enumeration;
@@ -33,6 +34,7 @@ public class SipClient implements SipListener {
     private static final String TAG = "SipClient";
     private static final int MAX_FWDS = 70;
     private static final int DEFAULT_REGISTRATION_LEN = 600;
+    private static final String ALLOWED_METHODS = Request.ACK + ", " + Request.BYE + Request.INVITE + Request.OPTIONS;
     private android.content.Context parent;
     private SipFactory sipFactory;
     private SipStack sipStack;
@@ -53,6 +55,7 @@ public class SipClient implements SipListener {
     private ContactHeader localContactHeader;
     private String registrationID;
     private TextMessageListener messageReceiver;
+    SecureRandom randomGen;
 
     public SipClient(Context parent, String username, String server, String password, TextMessageListener listener)
             throws SipException {
@@ -68,6 +71,7 @@ public class SipClient implements SipListener {
     }
 
     private void finishInit() throws SipException {
+        randomGen = new SecureRandom();
         try {
             findLocalIP();
         } catch (SocketException e) {
@@ -148,14 +152,11 @@ public class SipClient implements SipListener {
     }
 
     private void doRegister(int registrationLength) throws android.net.sip.SipException {
-        int tag = (new Random()).nextInt();
+        int tag = randomGen.nextInt();
         URI requestURI = serverSipAddress.getURI();
 
         try {
-            ArrayList<ViaHeader> viaHeaders = new ArrayList<ViaHeader>();
-            ViaHeader viaHeader = headerFactory.createViaHeader(listeningPoint.getIPAddress(),
-                    listeningPoint.getPort(), protocol, null);
-            viaHeaders.add(viaHeader);
+            ArrayList<ViaHeader> viaHeaders = createViaHeaders();
             MaxForwardsHeader maxForwardsHeader = headerFactory.createMaxForwardsHeader(MAX_FWDS);            
             CSeqHeader cSeqHeader = headerFactory.createCSeqHeader(1L, "REGISTER");
             CallIdHeader callIdHeader = sipProvider.getNewCallId();
@@ -168,9 +169,9 @@ public class SipClient implements SipListener {
 
             FromHeader fromHeader = headerFactory.createFromHeader(serverSipAddress, String.valueOf(tag));
             ToHeader toHeader = headerFactory.createToHeader(serverSipAddress, null);
-            ExpiresHeader expiresHeader = headerFactory.createExpiresHeader(registrationLength);
             Request request = messageFactory.createRequest(requestURI, "REGISTER", callIdHeader,
                     cSeqHeader, fromHeader, toHeader, viaHeaders, maxForwardsHeader);
+            ExpiresHeader expiresHeader = headerFactory.createExpiresHeader(registrationLength);
             request.addHeader(expiresHeader);
             request.addHeader(localContactHeader);
 
@@ -189,6 +190,14 @@ public class SipClient implements SipListener {
             // TODO handle the again-numerous error cases
             e.printStackTrace();
         }
+    }
+
+    private ArrayList<ViaHeader> createViaHeaders() throws ParseException, InvalidArgumentException {
+        ArrayList<ViaHeader> viaHeaders = new ArrayList<ViaHeader>();
+        ViaHeader viaHeader = headerFactory.createViaHeader(listeningPoint.getIPAddress(),
+                listeningPoint.getPort(), protocol, null);
+        viaHeaders.add(viaHeader);
+        return viaHeaders;
     }
 
     // should use the same call ID as the original register, and increment the CSeq
@@ -234,7 +243,34 @@ public class SipClient implements SipListener {
     }
 
     private void sendOptions(Request request) {
+        int tag = randomGen.nextInt();
+        try {
+            /*ArrayList<ViaHeader> viaHeaders = createViaHeaders();
+            MaxForwardsHeader maxForwardsHeader = headerFactory.createMaxForwardsHeader(MAX_FWDS);
+            CSeqHeader cSeqHeader = (CSeqHeader)request.getHeader("CSeq").clone();
+            CallIdHeader callIdHeader = (CallIdHeader)request.getHeader("Call-ID").clone();
+            FromHeader fromHeader = headerFactory.createFromHeader(serverSipAddress, String.valueOf(tag));
+            //UserAgentHeader userAgentHeader = headerFactory.createUserAgentHeader()
+            FromHeader senderHeader = (FromHeader)request.getHeader("From");
+            Address sender = senderHeader.getAddress();
+            ToHeader toHeader = headerFactory.createToHeader(sender, senderHeader.getTag());
 
+            Response response = messageFactory.cre*/
+            AllowHeader allowHeader = headerFactory.createAllowHeader(ALLOWED_METHODS);
+            Response response = messageFactory.createResponse(getCurrentStatusCode(), request);
+            response.addHeader(allowHeader);
+            SipResponder responder = new SipResponder(sipProvider);
+            responder.execute(request, response);
+        } catch (Exception e) {
+            // again, this is a lot of exceptions to catch all at once. oh well...
+            e.printStackTrace();
+        }
+
+    }
+
+    private int getCurrentStatusCode() {
+        return Response.OK;
+        // TODO implement this to return current status in response to an INVITE
     }
 
     private void receiveCall(Request request) {
@@ -293,6 +329,29 @@ public class SipClient implements SipListener {
                 return "Success";
             } catch (SipException e) {
                 Log.e(TAG, "the request still failed. UGH");
+                e.printStackTrace();
+                return null;
+            }
+        }
+    }
+    private class SipResponder extends AsyncTask<Message, String, String> {
+        private static final String TAG = "BACKGROUND";
+        private SipProvider sipProvider;
+
+        public SipResponder(SipProvider provider) {
+            sipProvider = provider;
+        }
+
+        @Override
+        protected String doInBackground(Message... messages) {
+            Request request = (Request)messages[0];
+            Response response = (Response)messages[1];
+            try {
+                ServerTransaction transaction = sipProvider.getNewServerTransaction(request);
+                transaction.sendResponse(response);
+                return "Success";
+            } catch (Exception e) {
+                Log.e(TAG, "the response failed. UGH");
                 e.printStackTrace();
                 return null;
             }
