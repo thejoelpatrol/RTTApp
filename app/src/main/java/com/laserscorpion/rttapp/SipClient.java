@@ -17,7 +17,9 @@ import org.w3c.dom.Text;
 import java.lang.reflect.Constructor;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
+import java.net.Socket;
 import java.net.SocketException;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.Properties;
@@ -49,12 +51,11 @@ public class SipClient implements SipListener {
     private Address localSipAddress;
     private Address serverSipAddress;
     private ContactHeader localContactHeader;
-    //private ClientTransaction transaction;
     private String registrationID;
     private TextMessageListener messageReceiver;
 
     public SipClient(Context parent, String username, String server, String password, TextMessageListener listener)
-            throws java.text.ParseException, java.net.SocketException {
+            throws SipException {
         this.parent = parent;
         this.username = username;
         this.server = server;
@@ -66,7 +67,7 @@ public class SipClient implements SipListener {
         finishInit();
     }
 
-    private void finishInit() throws java.net.SocketException {
+    private void finishInit() throws SipException {
         try {
             findLocalIP();
         } catch (SocketException e) {
@@ -78,31 +79,21 @@ public class SipClient implements SipListener {
         properties = new Properties();
         properties.setProperty("android.javax.sip.STACK_NAME", "stack");
         properties.setProperty("android.javax.sip.IP_ADDRESS", localIP);
-        //properties.setProperty("android.javax.sip.REENTRANT_LISTENER", "true");
         properties.setProperty("android.javax.sip.TRACE_LEVEL", "32");
         try {
-            /*Class[] e = new Class[]{Class.forName("java.util.Properties")};
-            Constructor errmsg1 = Class.forName("android.gov.nist" + ".javax.sip.SipStackImpl").getConstructor(e);
-            Object[] conArgs = new Object[]{properties};
-            sipStack = (SipStack)errmsg1.newInstance(conArgs);*/
-
             sipStack = sipFactory.createSipStack(properties);
             messageFactory = sipFactory.createMessageFactory();
             headerFactory = sipFactory.createHeaderFactory();
             addressFactory = sipFactory.createAddressFactory();
             listeningPoint = sipStack.createListeningPoint(localIP, port, protocol); // a ListeningPoint is a socket wrapper
-                                                                        // TODO allow different ports if this one is not available
+            // TODO allow different ports if this one is not available
             sipProvider = sipStack.createSipProvider(listeningPoint);
             sipProvider.addSipListener(this);
             localSipAddress = addressFactory.createAddress("sip:" + username + "@" + localIP + ":" + listeningPoint.getPort());
             serverSipAddress = addressFactory.createAddress("sip:" + username + "@" + server);
             localContactHeader = headerFactory.createContactHeader(localSipAddress);
         } catch (Exception e) {
-            // TODO: print some error somehow
-            // there are a ton of exceptions that could occur here, this doesn't seem smart
-            // i just don't even understand why the SIP stack wouldn't support UDP or why it couldn't be found in the first place
-            // maybe more realistically it wouldn't support _TCP_, ok fine
-            e.printStackTrace();
+            throw new SipException("Error: could not create SIP stack");
         }
     }
 

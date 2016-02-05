@@ -83,12 +83,9 @@ public class RTTCallActivity extends AppCompatActivity implements TextMessageLis
     private void resetTexter() {
         try {
             texter = new SipClient(this, getUsername(), getRegistrar(), getPassword(), this);
-        } catch (java.text.ParseException e) {
-            // TODO throw up a dialog about unable to parse username/server
-            Log.e(TAG, "Unable to parse username/server");
-        } catch (SocketException e) {
-            // TODO throw up a dialog about unable to connect to internet
-            Log.e(TAG, "Unable to open an internet socket");
+        } catch (android.javax.sip.SipException e) {
+            addText("Error: failed to initialize SIP stack");
+            // TODO prevent anything else from being attempted
         }
     }
 
