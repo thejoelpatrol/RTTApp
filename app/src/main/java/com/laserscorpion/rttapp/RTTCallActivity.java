@@ -17,7 +17,7 @@ import android.widget.TextView;
 
 import java.net.SocketException;
 
-public class RTTCallActivity extends AppCompatActivity {
+public class RTTCallActivity extends AppCompatActivity implements TextMessageListener {
     public static final String TAG = "RTTCallActivity";
     private String REGISTRAR_PREF_NAME; // these are basically constants
     private String USERNAME_PREF_NAME; // but you can't access xml resources statically
@@ -39,12 +39,12 @@ public class RTTCallActivity extends AppCompatActivity {
         PASSWORD_PREF_NAME = getString(R.string.pref_password_qualified);
 
         sipManager = new SipRTTManager(this);
-        resetTexter();
     }
 
     @Override
     protected void onStart() {
         super.onStart();
+        resetTexter();
         register();
     }
 
@@ -82,7 +82,7 @@ public class RTTCallActivity extends AppCompatActivity {
 
     private void resetTexter() {
         try {
-            texter = new SipClient(this, getUsername(), getRegistrar(), getPassword());
+            texter = new SipClient(this, getUsername(), getRegistrar(), getPassword(), this);
         } catch (java.text.ParseException e) {
             // TODO throw up a dialog about unable to parse username/server
             Log.e(TAG, "Unable to parse username/server");
@@ -99,7 +99,6 @@ public class RTTCallActivity extends AppCompatActivity {
         try {
             addText("Registering...\n");
             texter.register();
-            addText("Registered with server.");
         } catch (android.net.sip.SipException e) {
             // TODO send up a dialog or something
             addText("Failed to register with server: " + e.getMessage());
@@ -135,6 +134,11 @@ public class RTTCallActivity extends AppCompatActivity {
         }
         addText("Calling...\n");
         texter.call(contact);
+    }
+
+    @Override
+    public void TextMessageReceived(String message) {
+        addText(message + '\n');
     }
 }
 

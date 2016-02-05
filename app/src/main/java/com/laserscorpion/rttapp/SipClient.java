@@ -12,6 +12,8 @@ import android.os.AsyncTask;
 import android.util.Log;
 import android.javax.sip.*;
 
+import org.w3c.dom.Text;
+
 import java.lang.reflect.Constructor;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
@@ -47,11 +49,11 @@ public class SipClient implements SipListener {
     private Address localSipAddress;
     private Address serverSipAddress;
     private ContactHeader localContactHeader;
-    private ClientTransaction transaction;
+    //private ClientTransaction transaction;
     private String registrationID;
-    private Request origRegistrationRequest;
+    private TextMessageListener messageReceiver;
 
-    public SipClient(Context parent, String username, String server, String password)
+    public SipClient(Context parent, String username, String server, String password, TextMessageListener listener)
             throws java.text.ParseException, java.net.SocketException {
         this.parent = parent;
         this.username = username;
@@ -60,6 +62,7 @@ public class SipClient implements SipListener {
         org.apache.log4j.BasicConfigurator.configure();
         org.apache.log4j.Logger log = org.apache.log4j.Logger.getRootLogger();
         log.setLevel(org.apache.log4j.Level.ALL);
+        messageReceiver = listener;
         finishInit();
     }
 
@@ -75,7 +78,7 @@ public class SipClient implements SipListener {
         properties = new Properties();
         properties.setProperty("android.javax.sip.STACK_NAME", "stack");
         properties.setProperty("android.javax.sip.IP_ADDRESS", localIP);
-        properties.setProperty("android.javax.sip.REENTRANT_LISTENER", "true");
+        //properties.setProperty("android.javax.sip.REENTRANT_LISTENER", "true");
         properties.setProperty("android.javax.sip.TRACE_LEVEL", "32");
         try {
             /*Class[] e = new Class[]{Class.forName("java.util.Properties")};
@@ -162,17 +165,16 @@ public class SipClient implements SipListener {
             ViaHeader viaHeader = headerFactory.createViaHeader(listeningPoint.getIPAddress(),
                     listeningPoint.getPort(), protocol, null);
             viaHeaders.add(viaHeader);
-            MaxForwardsHeader maxForwardsHeader = headerFactory.createMaxForwardsHeader(MAX_FWDS);
-            
-            CallIdHeader callIdHeader = sipProvider.getNewCallId();
+            MaxForwardsHeader maxForwardsHeader = headerFactory.createMaxForwardsHeader(MAX_FWDS);            
             CSeqHeader cSeqHeader = headerFactory.createCSeqHeader(1L, "REGISTER");
+            CallIdHeader callIdHeader = sipProvider.getNewCallId();
             if (registrationLength == 0) {
                 cSeqHeader.setSeqNumber(2L);
                 callIdHeader.setCallId(registrationID);
             }
             else
                 registrationID = callIdHeader.getCallId();
-            
+
             FromHeader fromHeader = headerFactory.createFromHeader(serverSipAddress, String.valueOf(tag));
             ToHeader toHeader = headerFactory.createToHeader(serverSipAddress, null);
             ExpiresHeader expiresHeader = headerFactory.createExpiresHeader(registrationLength);
@@ -183,10 +185,15 @@ public class SipClient implements SipListener {
 
             Log.d(TAG, "Sending stateful registration for " + serverSipAddress);
 
-            transaction = sipProvider.getNewClientTransaction(request);
+
             SipRequester requester = new SipRequester(sipProvider);
-            requester.execute(transaction);
-            requester.get(); // wait for the request to send, but not for its response
+            requester.execute(request);
+            // we must wait for the request to send, but not for its response
+            // get() waits on the other thread, yes this removes the benefit of threading
+            if (requester.get().equals("Success")) {
+                messageReceiver.TextMessageReceived("Sent registration request");
+            }
+
         } catch (Exception e) {
             // TODO handle the again-numerous error cases
             e.printStackTrace();
@@ -207,12 +214,12 @@ public class SipClient implements SipListener {
     public void close() {
         try {
             sipProvider.removeListeningPoint(listeningPoint);
+            sipProvider.removeSipListener(this);
             sipStack.deleteListeningPoint(listeningPoint);
             Log.d(TAG, "deleted listening point");
         } catch (ObjectInUseException e) {
             e.printStackTrace();
         }
-        //sipProvider.removeSipListener(this);
     }
 
     public void call(String username) {
@@ -225,6 +232,22 @@ public class SipClient implements SipListener {
         Request request = requestEvent.getRequest();
         Log.d(TAG, "received a request: ");
         Log.d(TAG, request.toString().substring(0,100));
+        switch (request.getMethod()) {
+            case Request.OPTIONS:
+                sendOptions(request);
+                break;
+            case Request.INVITE:
+                receiveCall(request);
+                break;
+        }
+    }
+
+    private void sendOptions(Request request) {
+
+    }
+
+    private void receiveCall(Request request) {
+
     }
 
     @Override
@@ -232,8 +255,16 @@ public class SipClient implements SipListener {
         Response response = responseEvent.getResponse();
         Log.d(TAG, "received a response: ");
         Log.d(TAG, response.toString().substring(0,100));
-        
+        int responseCode = responseEvent.getResponse().getStatusCode();
+        if (responseCode >= 300) {
+            messageReceiver.TextMessageReceived("SIP error: " + responseCode);
+        } else if (responseCode >= 200) {
+            messageReceiver.TextMessageReceived("SIP OK");
+        } else {
+            // maybe not do anything?
+        }
     }
+
 
     @Override
     public void processTimeout(TimeoutEvent timeoutEvent) {
@@ -255,7 +286,7 @@ public class SipClient implements SipListener {
         Log.d(TAG, "received a DialogTerminated message");
     }
 
-    private class SipRequester extends AsyncTask<ClientTransaction, String, String> {
+    private class SipRequester extends AsyncTask<Request, String, String> {
         private static final String TAG = "BACKGROUND";
         private SipProvider sipProvider;
 
@@ -264,19 +295,16 @@ public class SipClient implements SipListener {
         }
 
         @Override
-        protected String doInBackground(ClientTransaction... transactions) {
+        protected String doInBackground(Request... requests) {
             try {
-                transactions[0].sendRequest();
-                try {
-                    Thread.sleep(1000,0);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
+                ClientTransaction transaction = sipProvider.getNewClientTransaction(requests[0]);
+                transaction.sendRequest();
+                return "Success";
             } catch (SipException e) {
                 Log.e(TAG, "the request still failed. UGH");
                 e.printStackTrace();
+                return null;
             }
-            return transactions[0].getState().toString();
         }
     }
 }
