@@ -34,7 +34,8 @@ public class SipClient implements SipListener {
     private static final String TAG = "SipClient";
     private static final int MAX_FWDS = 70;
     private static final int DEFAULT_REGISTRATION_LEN = 600;
-    private static final String ALLOWED_METHODS = Request.ACK + ", " + Request.BYE + Request.INVITE + Request.OPTIONS;
+    private static final String ALLOWED_METHODS = Request.ACK + ", " + Request.BYE + ", "
+                                                + Request.INVITE + ", " + Request.OPTIONS;
     private android.content.Context parent;
     private SipFactory sipFactory;
     private SipStack sipStack;
@@ -205,7 +206,6 @@ public class SipClient implements SipListener {
         try {
             Log.d(TAG, "re-registering for time 0");
             doRegister(0);
-            //sipProvider.removeSipListener(this);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -245,20 +245,16 @@ public class SipClient implements SipListener {
     private void sendOptions(Request request) {
         int tag = randomGen.nextInt();
         try {
-            /*ArrayList<ViaHeader> viaHeaders = createViaHeaders();
-            MaxForwardsHeader maxForwardsHeader = headerFactory.createMaxForwardsHeader(MAX_FWDS);
-            CSeqHeader cSeqHeader = (CSeqHeader)request.getHeader("CSeq").clone();
-            CallIdHeader callIdHeader = (CallIdHeader)request.getHeader("Call-ID").clone();
-            FromHeader fromHeader = headerFactory.createFromHeader(serverSipAddress, String.valueOf(tag));
-            //UserAgentHeader userAgentHeader = headerFactory.createUserAgentHeader()
-            FromHeader senderHeader = (FromHeader)request.getHeader("From");
-            Address sender = senderHeader.getAddress();
-            ToHeader toHeader = headerFactory.createToHeader(sender, senderHeader.getTag());
-
-            Response response = messageFactory.cre*/
             AllowHeader allowHeader = headerFactory.createAllowHeader(ALLOWED_METHODS);
             Response response = messageFactory.createResponse(getCurrentStatusCode(), request);
             response.addHeader(allowHeader);
+            ToHeader toHeader = (ToHeader)response.getHeader("To");
+            toHeader.setTag(String.valueOf(tag));
+            response.removeHeader("To");
+            response.addHeader(toHeader);
+            if (request.getHeader("Accept") != null) {
+                // TODO send the message body that this request is demanding
+            }
             SipResponder responder = new SipResponder(sipProvider);
             responder.execute(request, response);
         } catch (Exception e) {
