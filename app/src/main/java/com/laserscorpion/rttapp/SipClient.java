@@ -307,7 +307,7 @@ public class SipClient implements SipListener {
         }
     }
 
-    public void call(String URI) throws SipException, ParseException {
+    public void call(String URI) throws SipException, ParseException, TransactionUnavailableException {
         boolean available = callLock.tryAcquire();
         if (!available)
             throw new TransactionUnavailableException();
@@ -325,10 +325,8 @@ public class SipClient implements SipListener {
         } catch (Exception e) {
 
         }
-        try {
-            Thread.sleep(500, 0);
-        } catch (InterruptedException e) {}
         Log.d(TAG, "calling " + URI);
+        sendControlMessage("calling " + URI);
     }
 
 

@@ -35,12 +35,23 @@
             android:theme="@style/AppTheme.NoActionBar" />
         <activity
             android:name=".RTTRegistrationActivity"
-            android:label="@string/title_activity_rttcall"
+            android:label="@string/title_activity_rttregistration"
             android:parentActivityName=".FirstActivity"
             android:theme="@style/AppTheme.NoActionBar">
             <meta-data
                 android:name="android.support.PARENT_ACTIVITY"
                 android:value="com.laserscorpion.rttapp.FirstActivity" />
-        </activity>    </application>
+        </activity>
+        <activity
+            android:name=".RTTCallActivity"
+            android:label="@string/title_activity_rttcall"
+            android:parentActivityName=".RTTRegistrationActivity"
+            android:theme="@style/AppTheme.NoActionBar">
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="com.laserscorpion.rttapp.RTTRegistrationActivity" />
+        </activity>
+
+    </application>
 
 </manifest>

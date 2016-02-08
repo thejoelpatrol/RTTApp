@@ -15,6 +15,7 @@
     <string name="pref_registrar_qualified">com.laserscorpion.rttapp.pref_registrar</string>
     <string name="pref_password_qualified">com.laserscorpion.rttapp.pref_password</string>
     <string name="title_activity_rttcall">RTTCallActivity</string>
+    <string name="title_activity_rttregistration">RTTRegistrationActivity</string>
     <string name="title_activity_scrolling">ScrollingActivity</string>
 
 </resources>

@@ -39,7 +39,6 @@ public class RTTRegistrationActivity extends AppCompatActivity implements TextLi
         REGISTRAR_PREF_NAME = getString(R.string.pref_registrar_qualified);
         USERNAME_PREF_NAME = getString(R.string.pref_username_qualified);
         PASSWORD_PREF_NAME = getString(R.string.pref_password_qualified);
-        //sipManager = new SipRTTManager(this);
         try {
             SipClient.init(this, getUsername(), getRegistrar(), getPassword(), this);
         } catch (android.javax.sip.SipException e) {
@@ -133,18 +132,10 @@ public class RTTRegistrationActivity extends AppCompatActivity implements TextLi
             addText("Error: enter an address to call\n");
             return;
         }
-        addText("Calling...\n");
-        try {
-            Intent intent = new Intent(this, RTTCallActivity.class);
-            startActivity(intent);
-            texter.call(contact);
-        } catch (ParseException e) {
-            addText("Invalid contact address: " + contact);
-        } catch (TransactionUnavailableException e) {
-            addText("Can't call right now - SIP stack busy");
-        } catch (android.javax.sip.SipException e) {
-            addText("Call failed: " + e.getMessage());
-        }
+        Intent intent = new Intent(this, RTTCallActivity.class);
+        intent.putExtra("com.laserscorpion.rttapp.contact_uri", contact);
+        startActivity(intent);
+        //texter.call(contact);
     }
 
 
