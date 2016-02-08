@@ -33,7 +33,8 @@ import java.util.concurrent.Semaphore;
 /**
  * Some of this class based on http://alex.bikfalvi.com/teaching/upf/2013/architecture_and_signaling/lab/sip/
  */
-public class SipClient implements SipListener, Serializable {
+public class SipClient implements SipListener {
+    private static SipClient instance;
     private static final String TAG = "SipClient";
     private static final int MAX_FWDS = 70;
     private static final int DEFAULT_REGISTRATION_LEN = 600;
@@ -63,9 +64,30 @@ public class SipClient implements SipListener, Serializable {
     private SecureRandom randomGen;
     private Semaphore callLock;
 
-    public SipClient(Context parent, String username, String server, String password, TextListener listener)
+    /**
+     * Initializes the SipClient to prepare it to register with a server and make calls. Must be called
+     * before getInstance(). Calling again resets the parameters to the new ones (note that this will
+     * remove all previous TextListeners).
+     * @param context
+     * @param username
+     * @param server
+     * @param password
+     * @param listener
+     * @throws SipException if the SIP stack can't be created, or the username/password/server can't be parsed correctly
+     */
+    public static void init(Context context, String username, String server, String password, TextListener listener)
             throws SipException {
-        this.parent = parent;
+        if (instance != null) {
+            instance.reset(context, username, server, password, listener);
+            return;
+        }
+        instance = new SipClient(context, username, server, password, listener);
+    }
+
+    // TODO possibly call reset()
+    private SipClient(Context context, String username, String server, String password, TextListener listener)
+            throws SipException {
+        this.parent = context;
         this.username = username;
         this.server = server;
         this.password = password;
@@ -108,6 +130,36 @@ public class SipClient implements SipListener, Serializable {
         } catch (Exception e) {
             throw new SipException("Error: could not create SIP stack");
         }
+    }
+
+    public void reset(Context context, String username, String server, String password, TextListener listener) throws SipException {
+        Address newGlobalSipAddress = null;
+        Address localSipAddress = null;
+        try {
+            newGlobalSipAddress = addressFactory.createAddress("sip:" + username + "@" + server);
+            localSipAddress = addressFactory.createAddress("sip:" + username + "@" + localIP + ":" + listeningPoint.getPort());
+            localContactHeader = headerFactory.createContactHeader(localSipAddress);
+        } catch (ParseException e) {
+            throw new SipException("Error: could not parse new account parameters");
+        }
+        this.parent = context;
+        this.username = username;
+        this.server = server;
+        this.password = password;
+        globalSipAddress = newGlobalSipAddress;
+        messageReceivers = new ArrayList<TextListener>();
+        addTextReceiver(listener);
+    }
+
+    /**
+     * Get a handle to the single global SipClient
+     * Precondition: init() must be called first at least once
+     * @return a handle to the single global SipClient
+     */
+    public static SipClient getInstance() {
+        if (instance == null)
+            throw new IllegalStateException("Singleton SipClient has not been initialized yet - init() before getInstance()");
+        return instance;
     }
 
     private boolean hasInternetConnection() {
@@ -273,8 +325,10 @@ public class SipClient implements SipListener, Serializable {
         } catch (Exception e) {
 
         }
-
-            Log.d(TAG, "calling " + URI);
+        try {
+            Thread.sleep(500, 0);
+        } catch (InterruptedException e) {}
+        Log.d(TAG, "calling " + URI);
     }
 
 

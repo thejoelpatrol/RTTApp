@@ -50,6 +50,7 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener {
 
     @Override
     public void ControlMessageReceived(String message) {
+        addText(message + '\n');
     }
 
     @Override

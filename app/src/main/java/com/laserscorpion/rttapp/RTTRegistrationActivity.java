@@ -40,7 +40,14 @@ public class RTTRegistrationActivity extends AppCompatActivity implements TextLi
         USERNAME_PREF_NAME = getString(R.string.pref_username_qualified);
         PASSWORD_PREF_NAME = getString(R.string.pref_password_qualified);
         //sipManager = new SipRTTManager(this);
-        resetTexter();
+        try {
+            SipClient.init(this, getUsername(), getRegistrar(), getPassword(), this);
+        } catch (android.javax.sip.SipException e) {
+            addText("Error: failed to initialize SIP stack");
+            // TODO replace this with a dialog
+            // TODO prevent anything else from being attempted - kill the activity
+        }
+        texter = SipClient.getInstance();
     }
 
     @Override
@@ -63,7 +70,7 @@ public class RTTRegistrationActivity extends AppCompatActivity implements TextLi
         } catch (SipException e) {
             addText("Failed to unregister: " + e);
         }
-        this.unregisterReceiver(callReceiver);
+        //this.unregisterReceiver(callReceiver);
     }
 
     private String getRegistrar() {
@@ -79,15 +86,6 @@ public class RTTRegistrationActivity extends AppCompatActivity implements TextLi
     private String getPassword() {
         SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(this);
         return pref.getString(PASSWORD_PREF_NAME, "fail");
-    }
-
-    private void resetTexter() {
-        try {
-            texter = new SipClient(this, getUsername(), getRegistrar(), getPassword(), this);
-        } catch (android.javax.sip.SipException e) {
-            addText("Error: failed to initialize SIP stack");
-            // TODO prevent anything else from being attempted
-        }
     }
 
     /**
@@ -134,8 +132,6 @@ public class RTTRegistrationActivity extends AppCompatActivity implements TextLi
         addText("Calling...\n");
         try {
             Intent intent = new Intent(this, RTTCallActivity.class);
-            Bundle sipBundle = new Bundle();
-            intent.putExtra("com.laserscorpion.rttapp.SipClient", texter);
             startActivity(intent);
             texter.call(contact);
         } catch (ParseException e) {
