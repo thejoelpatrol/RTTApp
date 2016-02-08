@@ -1,23 +1,16 @@
 package com.laserscorpion.rttapp;
 
-import android.content.IntentFilter;
-import android.content.SharedPreferences;
-import android.net.sip.SipException;
 import android.os.Bundle;
-import android.preference.PreferenceManager;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.text.method.ScrollingMovementMethod;
-import android.view.View;
-import android.widget.EditText;
 import android.widget.TextView;
-
-import java.text.ParseException;
 
 
 public class RTTCallActivity extends AppCompatActivity implements TextListener {
     public static final String TAG = "RTTCallActivity";
     private SipClient texter;
+    private TextListener previousTextListener;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -28,7 +21,8 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener {
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         TextView view = (TextView)findViewById(R.id.textview);
         view.setMovementMethod(new ScrollingMovementMethod());
-
+        texter = (SipClient)savedInstanceState.get("com.laserscorpion.rttapp.SipClient");
+        texter.addTextReceiver(this);
     }
 
     @Override
@@ -51,12 +45,16 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener {
     private void addText(String text) {
         TextView view = (TextView)findViewById(R.id.textview);
         String currentText = view.getText().toString();
-        view.setText(currentText + text);
+        view.append(text);
     }
 
     @Override
-    public void TextMessageReceived(String message) {
-        addText(message + '\n');
+    public void ControlMessageReceived(String message) {
+    }
+
+    @Override
+    public void RTTextReceived(String text) {
+        addText(text);
     }
 }
 

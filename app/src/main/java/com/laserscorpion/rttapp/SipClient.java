@@ -15,6 +15,7 @@ import android.javax.sip.*;
 
 import org.w3c.dom.Text;
 
+import java.io.Serializable;
 import java.lang.reflect.Constructor;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
@@ -32,7 +33,7 @@ import java.util.concurrent.Semaphore;
 /**
  * Some of this class based on http://alex.bikfalvi.com/teaching/upf/2013/architecture_and_signaling/lab/sip/
  */
-public class SipClient implements SipListener {
+public class SipClient implements SipListener, Serializable {
     private static final String TAG = "SipClient";
     private static final int MAX_FWDS = 70;
     private static final int DEFAULT_REGISTRATION_LEN = 600;
@@ -58,7 +59,7 @@ public class SipClient implements SipListener {
     private Address globalSipAddress;
     private ContactHeader localContactHeader;
     private String registrationID;
-    private TextListener messageReceiver;
+    private ArrayList<TextListener> messageReceivers;
     private SecureRandom randomGen;
     private Semaphore callLock;
 
@@ -71,7 +72,8 @@ public class SipClient implements SipListener {
         org.apache.log4j.BasicConfigurator.configure();
         org.apache.log4j.Logger log = org.apache.log4j.Logger.getRootLogger();
         log.setLevel(org.apache.log4j.Level.ALL);
-        messageReceiver = listener;
+        messageReceivers = new ArrayList<TextListener>();
+        messageReceivers.add(listener);
         randomGen = new SecureRandom();
         callLock = new Semaphore(1);
         allowed_methods = TextUtils.join(", ", ALLOWED_METHODS);
@@ -163,8 +165,20 @@ public class SipClient implements SipListener {
      *                    messages from from the SipClient. If null, the SipClient's
      *                    text output will not be processed by anyone.
      */
-    public void setTextReceiver(TextListener newReceiver) {
-        messageReceiver = newReceiver;
+    public void addTextReceiver(TextListener newReceiver) {
+        messageReceivers.add(newReceiver);
+    }
+
+    private void sendControlMessage(String message) {
+        for (TextListener listener : messageReceivers) {
+            listener.ControlMessageReceived(message);
+        }
+    }
+
+    private void sendRTTChars(String add) {
+        for (TextListener listener : messageReceivers) {
+            listener.RTTextReceived(add);
+        }
     }
 
     public void register() throws android.net.sip.SipException {
@@ -202,7 +216,7 @@ public class SipClient implements SipListener {
                 // get() waits on the other thread
                 // we must wait for the request to send, but not for its response
                 // we (probably) aren't waiting long enough to lose the benefit of threading
-                messageReceiver.TextMessageReceived("Sent registration request");
+                sendControlMessage("Sent registration request");
             }
 
         } catch (Exception e) {
@@ -321,16 +335,16 @@ public class SipClient implements SipListener {
     @Override
     public void processResponse(ResponseEvent responseEvent) {
         Response response = responseEvent.getResponse();
-        Log.d(TAG, "received a response: ");
-        Log.d(TAG, response.toString().substring(0,100));
+        //Log.d(TAG, "received a response: ");
+        //Log.d(TAG, response.toString().substring(0,100));
         int responseCode = responseEvent.getResponse().getStatusCode();
         if (responseCode >= 300) {
-            messageReceiver.TextMessageReceived("SIP error: " + responseCode);
+            sendControlMessage("SIP error: " + responseCode);
         } else if (responseCode >= 200) {
-            messageReceiver.TextMessageReceived("SIP OK");
+            sendControlMessage("SIP OK");
         } else {
             if (responseCode == Response.RINGING) {
-                messageReceiver.TextMessageReceived("Ringing...");
+                sendControlMessage("Ringing...");
             }
             // maybe not do anything else for 1xx?
         }

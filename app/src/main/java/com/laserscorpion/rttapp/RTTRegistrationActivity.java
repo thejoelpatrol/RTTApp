@@ -1,5 +1,6 @@
 package com.laserscorpion.rttapp;
 
+import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.javax.sip.TransactionUnavailableException;
@@ -38,14 +39,13 @@ public class RTTRegistrationActivity extends AppCompatActivity implements TextLi
         REGISTRAR_PREF_NAME = getString(R.string.pref_registrar_qualified);
         USERNAME_PREF_NAME = getString(R.string.pref_username_qualified);
         PASSWORD_PREF_NAME = getString(R.string.pref_password_qualified);
-
-        sipManager = new SipRTTManager(this);
+        //sipManager = new SipRTTManager(this);
+        resetTexter();
     }
 
     @Override
     protected void onStart() {
         super.onStart();
-        resetTexter();
         register();
     }
 
@@ -103,15 +103,15 @@ public class RTTRegistrationActivity extends AppCompatActivity implements TextLi
             return;
         }
         
-        registerCallReceiver();
+        //registerCallReceiver();
     }
 
-    private void registerCallReceiver() {
+    /*private void registerCallReceiver() {
         IntentFilter filter = new IntentFilter();
         filter.addAction("com.laserscorpion.rttapp.INCOMING_CALL");
         callReceiver = new RTTIncomingCallReceiver();
         this.registerReceiver(callReceiver, filter);
-    }
+    }*/
 
     private void addText(String text) {
         TextView view = (TextView)findViewById(R.id.textview);
@@ -133,6 +133,10 @@ public class RTTRegistrationActivity extends AppCompatActivity implements TextLi
         }
         addText("Calling...\n");
         try {
+            Intent intent = new Intent(this, RTTCallActivity.class);
+            Bundle sipBundle = new Bundle();
+            intent.putExtra("com.laserscorpion.rttapp.SipClient", texter);
+            startActivity(intent);
             texter.call(contact);
         } catch (ParseException e) {
             addText("Invalid contact address: " + contact);
@@ -144,9 +148,15 @@ public class RTTRegistrationActivity extends AppCompatActivity implements TextLi
     }
 
 
+
     @Override
-    public void TextMessageReceived(String message) {
+    public void ControlMessageReceived(String message) {
         addText(message + '\n');
+    }
+
+    @Override
+    public void RTTextReceived(String text) {
+
     }
 }
 
