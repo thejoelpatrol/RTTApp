@@ -34,7 +34,7 @@
             android:label="@string/title_activity_settings"
             android:theme="@style/AppTheme.NoActionBar" />
         <activity
-            android:name=".RTTCallActivity"
+            android:name=".RTTRegistrationActivity"
             android:label="@string/title_activity_rttcall"
             android:parentActivityName=".FirstActivity"
             android:theme="@style/AppTheme.NoActionBar">

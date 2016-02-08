@@ -9,6 +9,7 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.sip.*;
 import android.os.AsyncTask;
+import android.text.TextUtils;
 import android.util.Log;
 import android.javax.sip.*;
 
@@ -25,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.Properties;
 import java.util.Random;
+import java.util.concurrent.Semaphore;
 
 
 /**
@@ -34,8 +36,10 @@ public class SipClient implements SipListener {
     private static final String TAG = "SipClient";
     private static final int MAX_FWDS = 70;
     private static final int DEFAULT_REGISTRATION_LEN = 600;
-    private static final String ALLOWED_METHODS = Request.ACK + ", " + Request.BYE + ", "
-                                                + Request.INVITE + ", " + Request.OPTIONS;
+    //private static final String ALLOWED_METHODS = Request.ACK + ", " + Request.BYE + ", "
+    //                                            + Request.INVITE + ", " + Request.OPTIONS;
+    private static final String ALLOWED_METHODS[] = {Request.ACK, Request.BYE, Request.INVITE, Request.OPTIONS};
+    private static String allowed_methods;
     private android.content.Context parent;
     private SipFactory sipFactory;
     private SipStack sipStack;
@@ -51,14 +55,14 @@ public class SipClient implements SipListener {
     private String localIP;
     private int port = ListeningPoint.PORT_5060;
     private String protocol = ListeningPoint.UDP.toLowerCase();;
-    private Address localSipAddress;
-    private Address serverSipAddress;
+    private Address globalSipAddress;
     private ContactHeader localContactHeader;
     private String registrationID;
-    private TextMessageListener messageReceiver;
-    SecureRandom randomGen;
+    private TextListener messageReceiver;
+    private SecureRandom randomGen;
+    private Semaphore callLock;
 
-    public SipClient(Context parent, String username, String server, String password, TextMessageListener listener)
+    public SipClient(Context parent, String username, String server, String password, TextListener listener)
             throws SipException {
         this.parent = parent;
         this.username = username;
@@ -68,11 +72,13 @@ public class SipClient implements SipListener {
         org.apache.log4j.Logger log = org.apache.log4j.Logger.getRootLogger();
         log.setLevel(org.apache.log4j.Level.ALL);
         messageReceiver = listener;
+        randomGen = new SecureRandom();
+        callLock = new Semaphore(1);
+        allowed_methods = TextUtils.join(", ", ALLOWED_METHODS);
         finishInit();
     }
 
     private void finishInit() throws SipException {
-        randomGen = new SecureRandom();
         try {
             findLocalIP();
         } catch (SocketException e) {
@@ -94,8 +100,8 @@ public class SipClient implements SipListener {
             // TODO allow different ports if this one is not available
             sipProvider = sipStack.createSipProvider(listeningPoint);
             sipProvider.addSipListener(this);
-            localSipAddress = addressFactory.createAddress("sip:" + username + "@" + localIP + ":" + listeningPoint.getPort());
-            serverSipAddress = addressFactory.createAddress("sip:" + username + "@" + server);
+            Address localSipAddress = addressFactory.createAddress("sip:" + username + "@" + localIP + ":" + listeningPoint.getPort());
+            globalSipAddress = addressFactory.createAddress("sip:" + username + "@" + server);
             localContactHeader = headerFactory.createContactHeader(localSipAddress);
         } catch (Exception e) {
             throw new SipException("Error: could not create SIP stack");
@@ -148,13 +154,26 @@ public class SipClient implements SipListener {
         return true;
     }
 
+    /**
+     * This method should be called when a user of SipClient needs to register a new
+     * receiver for the SipClient's text output. e.g. when the SipClient is handed from
+     * one Activity to another when the foremost activity changes. The old receiver is
+     * removed.
+     * @param newReceiver the new object (e.g. an Activity) that wants to handle text
+     *                    messages from from the SipClient. If null, the SipClient's
+     *                    text output will not be processed by anyone.
+     */
+    public void setTextReceiver(TextListener newReceiver) {
+        messageReceiver = newReceiver;
+    }
+
     public void register() throws android.net.sip.SipException {
         doRegister(DEFAULT_REGISTRATION_LEN);
     }
 
     private void doRegister(int registrationLength) throws android.net.sip.SipException {
         int tag = randomGen.nextInt();
-        URI requestURI = serverSipAddress.getURI();
+        URI requestURI = globalSipAddress.getURI();
 
         try {
             ArrayList<ViaHeader> viaHeaders = createViaHeaders();
@@ -168,22 +187,21 @@ public class SipClient implements SipListener {
             else
                 registrationID = callIdHeader.getCallId();
 
-            FromHeader fromHeader = headerFactory.createFromHeader(serverSipAddress, String.valueOf(tag));
-            ToHeader toHeader = headerFactory.createToHeader(serverSipAddress, null);
+            FromHeader fromHeader = headerFactory.createFromHeader(globalSipAddress, String.valueOf(tag));
+            ToHeader toHeader = headerFactory.createToHeader(globalSipAddress, null);
             Request request = messageFactory.createRequest(requestURI, "REGISTER", callIdHeader,
                     cSeqHeader, fromHeader, toHeader, viaHeaders, maxForwardsHeader);
             ExpiresHeader expiresHeader = headerFactory.createExpiresHeader(registrationLength);
             request.addHeader(expiresHeader);
             request.addHeader(localContactHeader);
 
-            Log.d(TAG, "Sending stateful registration for " + serverSipAddress);
-
-
+            Log.d(TAG, "Sending stateful registration for " + globalSipAddress);
             SipRequester requester = new SipRequester(sipProvider);
             requester.execute(request);
-            // we must wait for the request to send, but not for its response
-            // get() waits on the other thread, yes this removes the benefit of threading
             if (requester.get().equals("Success")) {
+                // get() waits on the other thread
+                // we must wait for the request to send, but not for its response
+                // we (probably) aren't waiting long enough to lose the benefit of threading
                 messageReceiver.TextMessageReceived("Sent registration request");
             }
 
@@ -201,12 +219,12 @@ public class SipClient implements SipListener {
         return viaHeaders;
     }
 
-    // should use the same call ID as the original register, and increment the CSeq
     public void unregister() throws android.net.sip.SipException {
         try {
             Log.d(TAG, "re-registering for time 0");
             doRegister(0);
         } catch (Exception e) {
+            // TODO handle this
             e.printStackTrace();
         }
     }
@@ -218,12 +236,31 @@ public class SipClient implements SipListener {
             sipStack.deleteListeningPoint(listeningPoint);
             Log.d(TAG, "deleted listening point");
         } catch (ObjectInUseException e) {
+            // TODO handle this
             e.printStackTrace();
         }
     }
 
-    public void call(String username) {
-        Log.d(TAG, "calling " + username);
+    public void call(String URI) throws SipException, ParseException {
+        boolean available = callLock.tryAcquire();
+        if (!available)
+            throw new TransactionUnavailableException();
+        Address contact = addressFactory.createAddress("sip:" + URI);
+        int tag = randomGen.nextInt();
+
+        try {
+            ArrayList<ViaHeader> viaHeaders = createViaHeaders();
+            MaxForwardsHeader maxForwardsHeader = headerFactory.createMaxForwardsHeader(MAX_FWDS);
+            CSeqHeader cSeqHeader = headerFactory.createCSeqHeader(1L, "INVITE");
+            CallIdHeader callIdHeader = sipProvider.getNewCallId();
+            FromHeader fromHeader = headerFactory.createFromHeader(globalSipAddress, String.valueOf(tag));
+            ToHeader toHeader = headerFactory.createToHeader(contact, null);
+
+        } catch (Exception e) {
+
+        }
+
+            Log.d(TAG, "calling " + URI);
     }
 
 
@@ -239,13 +276,16 @@ public class SipClient implements SipListener {
             case Request.INVITE:
                 receiveCall(request);
                 break;
+            default:
+                Log.d(TAG, "Not implemented yet");
+                break;
         }
     }
 
     private void sendOptions(Request request) {
         int tag = randomGen.nextInt();
         try {
-            AllowHeader allowHeader = headerFactory.createAllowHeader(ALLOWED_METHODS);
+            AllowHeader allowHeader = headerFactory.createAllowHeader(allowed_methods);
             Response response = messageFactory.createResponse(getCurrentStatusCode(), request);
             response.addHeader(allowHeader);
             ToHeader toHeader = (ToHeader)response.getHeader("To");
@@ -259,14 +299,19 @@ public class SipClient implements SipListener {
             responder.execute(request, response);
         } catch (Exception e) {
             // again, this is a lot of exceptions to catch all at once. oh well...
+            // TODO handle this
             e.printStackTrace();
         }
 
     }
 
     private int getCurrentStatusCode() {
-        return Response.OK;
-        // TODO implement this to return current status in response to an INVITE
+        if (callLock.tryAcquire()) {
+            callLock.release();
+            return Response.OK;
+        } else {
+            return Response.BUSY_HERE;
+        }
     }
 
     private void receiveCall(Request request) {
@@ -284,7 +329,10 @@ public class SipClient implements SipListener {
         } else if (responseCode >= 200) {
             messageReceiver.TextMessageReceived("SIP OK");
         } else {
-            // maybe not do anything?
+            if (responseCode == Response.RINGING) {
+                messageReceiver.TextMessageReceived("Ringing...");
+            }
+            // maybe not do anything else for 1xx?
         }
     }
 
@@ -309,6 +357,7 @@ public class SipClient implements SipListener {
         Log.d(TAG, "received a DialogTerminated message");
     }
 
+    // these nested classes are used to fire one-off threads and then die
     private class SipRequester extends AsyncTask<Request, String, String> {
         private static final String TAG = "BACKGROUND";
         private SipProvider sipProvider;
@@ -338,6 +387,11 @@ public class SipClient implements SipListener {
             sipProvider = provider;
         }
 
+        /**
+         *
+         * @param messages must be exactly 2 Messages, a Request and a Response, in that order
+         * @return
+         */
         @Override
         protected String doInBackground(Message... messages) {
             Request request = (Request)messages[0];

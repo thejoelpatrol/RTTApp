@@ -21,7 +21,7 @@
 
     </android.support.design.widget.AppBarLayout>
 
-    <include layout="@layout/content_rttcall" />
+    <include layout="@layout/content_rttregistration" />
 
 
 </android.support.design.widget.CoordinatorLayout>

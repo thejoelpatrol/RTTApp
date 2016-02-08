@@ -17,21 +17,20 @@
         android:id="@+id/top_row"
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
+        <EditText
+            android:id="@+id/contact_name"
+            android:layout_alignParentTop="true"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="Contact Name"/>
         <Button
-            android:id="@+id/declineButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_alignParentTop="true"
-            android:text="Decline"
-            android:onClick="declineCall" />
-        <Button
-            android:id="@+id/acceptButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_alignParentTop="true"
-            android:layout_toRightOf="@id/declineButton"
-            android:text="Accept"
-            android:onClick="acceptCall" />
+            android:layout_toRightOf="@id/contact_name"
+            android:text="Connect"
+            android:onClick="call" />
     </LinearLayout>
         <TextView
             android:id="@+id/textview"
@@ -47,19 +46,5 @@
             android:maxLines="10"
             android:scrollbars="vertical"
             android:gravity="bottom" />
-        <EditText
-            android:id="@+id/compose_message"
-            android:background="@drawable/back"
-            android:paddingBottom="4dip"
-            android:paddingLeft="4dip"
-            android:paddingRight="4dip"
-            android:paddingTop="4dip"
-            android:layout_width="match_parent"
-            android:layout_height="200dip"
-            android:layout_below="@id/textview"
-            android:layout_weight="1"
-            android:maxLines="10"
-            android:scrollbars="vertical"
-            android:hint="Your text"/>
 
 </RelativeLayout>

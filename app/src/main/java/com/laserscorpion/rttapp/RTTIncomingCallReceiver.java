@@ -15,9 +15,9 @@ public class RTTIncomingCallReceiver extends BroadcastReceiver {
 
     /**
      * Processes the incoming call, answers it, and hands it over to the
-     * RTTCallActivity. This class mostly copied from
+     * RTTRegistrationActivity. This class mostly copied from
      * https://developer.android.com/guide/topics/connectivity/sip.html#intent_filter
-     * @param context the RTTCallActivity parent.
+     * @param context the RTTRegistrationActivity parent.
      * @param intent The intent being received.
      */
     @Override
@@ -42,7 +42,7 @@ public class RTTIncomingCallReceiver extends BroadcastReceiver {
                     }
                 }
             };
-            RTTCallActivity callActivity = (RTTCallActivity)context;
+            RTTRegistrationActivity callActivity = (RTTRegistrationActivity)context;
             incomingCall = callActivity.sipManager.takeRTTCall(intent, listener);
             incomingCall.answerCall(30);
             incomingCall.startAudio();

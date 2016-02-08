@@ -1,17 +1,11 @@
 package com.laserscorpion.rttapp;
 
-import android.app.PendingIntent;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.SharedPreferences;
-import android.net.sip.SipManager;
-import android.net.sip.SipProfile;
-import android.net.sip.SipRegistrationListener;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
-import android.util.Log;
 import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -54,7 +48,7 @@ public class FirstActivity extends AppCompatActivity {
 
     public void register(View view) {
         setServerPref();
-        Intent intent = new Intent(this, RTTCallActivity.class);
+        Intent intent = new Intent(this, RTTRegistrationActivity.class);
         startActivity(intent);
     }
 
