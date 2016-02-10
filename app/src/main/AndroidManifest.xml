@@ -37,6 +37,7 @@
             android:name=".RTTRegistrationActivity"
             android:label="@string/title_activity_rttregistration"
             android:parentActivityName=".FirstActivity"
+            android:launchMode="singleTop"
             android:theme="@style/AppTheme.NoActionBar">
             <meta-data
                 android:name="android.support.PARENT_ACTIVITY"

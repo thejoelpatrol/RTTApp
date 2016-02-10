@@ -25,6 +25,8 @@ import java.security.SecureRandom;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Properties;
 import java.util.Random;
 import java.util.concurrent.Semaphore;
@@ -38,10 +40,7 @@ public class SipClient implements SipListener {
     private static final String TAG = "SipClient";
     private static final int MAX_FWDS = 70;
     private static final int DEFAULT_REGISTRATION_LEN = 600;
-    //private static final String ALLOWED_METHODS = Request.ACK + ", " + Request.BYE + ", "
-    //                                            + Request.INVITE + ", " + Request.OPTIONS;
     private static final String ALLOWED_METHODS[] = {Request.ACK, Request.BYE, Request.INVITE, Request.OPTIONS};
-    private static String allowed_methods;
     private android.content.Context parent;
     private SipFactory sipFactory;
     private SipStack sipStack;
@@ -59,8 +58,11 @@ public class SipClient implements SipListener {
     private String protocol = ListeningPoint.UDP.toLowerCase();;
     private Address globalSipAddress;
     private ContactHeader localContactHeader;
+    private AllowHeader allowHeader;
+    private MaxForwardsHeader maxForwardsHeader;
     private String registrationID;
-    private ArrayList<TextListener> messageReceivers;
+    private List<TextListener> messageReceivers;
+    private List<SessionListener> sessionReceivers;
     private SecureRandom randomGen;
     private Semaphore callLock;
 
@@ -94,11 +96,12 @@ public class SipClient implements SipListener {
         org.apache.log4j.BasicConfigurator.configure();
         org.apache.log4j.Logger log = org.apache.log4j.Logger.getRootLogger();
         log.setLevel(org.apache.log4j.Level.ALL);
-        messageReceivers = new ArrayList<TextListener>();
+        messageReceivers = new LinkedList<TextListener>();
         messageReceivers.add(listener);
+        sessionReceivers = new LinkedList<SessionListener>();
         randomGen = new SecureRandom();
         callLock = new Semaphore(1);
-        allowed_methods = TextUtils.join(", ", ALLOWED_METHODS);
+        //allowed_methods = TextUtils.join(", ", ALLOWED_METHODS);
         finishInit();
     }
 
@@ -127,6 +130,8 @@ public class SipClient implements SipListener {
             Address localSipAddress = addressFactory.createAddress("sip:" + username + "@" + localIP + ":" + listeningPoint.getPort());
             globalSipAddress = addressFactory.createAddress("sip:" + username + "@" + server);
             localContactHeader = headerFactory.createContactHeader(localSipAddress);
+            allowHeader = headerFactory.createAllowHeader(TextUtils.join(", ", ALLOWED_METHODS));
+            maxForwardsHeader = headerFactory.createMaxForwardsHeader(MAX_FWDS);
         } catch (Exception e) {
             throw new SipException("Error: could not create SIP stack");
         }
@@ -218,9 +223,23 @@ public class SipClient implements SipListener {
      *                    text output will not be processed by anyone.
      */
     public void addTextReceiver(TextListener newReceiver) {
+        if (messageReceivers.contains(newReceiver))
+            return;
         messageReceivers.add(newReceiver);
     }
 
+    public void removeTextReceiver(TextListener receiver) {
+        if (messageReceivers.contains(receiver))
+            messageReceivers.remove(receiver);
+        /*for (TextListener listener : messageReceivers) {
+            if (listener == receiver)
+                messageReceivers.remove(listener);
+        }*/
+    }
+
+    public void addSessionListener(SessionListener newListener) {
+        sessionReceivers.add(newListener);
+    }
     private void sendControlMessage(String message) {
         for (TextListener listener : messageReceivers) {
             listener.ControlMessageReceived(message);
@@ -230,6 +249,12 @@ public class SipClient implements SipListener {
     private void sendRTTChars(String add) {
         for (TextListener listener : messageReceivers) {
             listener.RTTextReceived(add);
+        }
+    }
+
+    private void notifySessionFailed(String reason) {
+        for (SessionListener listener : sessionReceivers) {
+            listener.SessionFailed(reason);
         }
     }
 
@@ -243,7 +268,6 @@ public class SipClient implements SipListener {
 
         try {
             ArrayList<ViaHeader> viaHeaders = createViaHeaders();
-            MaxForwardsHeader maxForwardsHeader = headerFactory.createMaxForwardsHeader(MAX_FWDS);            
             CSeqHeader cSeqHeader = headerFactory.createCSeqHeader(1L, "REGISTER");
             CallIdHeader callIdHeader = sipProvider.getNewCallId();
             if (registrationLength == 0) {
@@ -310,37 +334,84 @@ public class SipClient implements SipListener {
     public void call(String URI) throws SipException, ParseException, TransactionUnavailableException {
         boolean available = callLock.tryAcquire();
         if (!available)
-            throw new TransactionUnavailableException();
+            throw new TransactionUnavailableException("Can't call now -- already on a call");
         Address contact = addressFactory.createAddress("sip:" + URI);
         int tag = randomGen.nextInt();
 
         try {
             ArrayList<ViaHeader> viaHeaders = createViaHeaders();
-            MaxForwardsHeader maxForwardsHeader = headerFactory.createMaxForwardsHeader(MAX_FWDS);
-            CSeqHeader cSeqHeader = headerFactory.createCSeqHeader(1L, "INVITE");
+            CSeqHeader cSeqHeader = headerFactory.createCSeqHeader(1L, Request.INVITE);
             CallIdHeader callIdHeader = sipProvider.getNewCallId();
             FromHeader fromHeader = headerFactory.createFromHeader(globalSipAddress, String.valueOf(tag));
             ToHeader toHeader = headerFactory.createToHeader(contact, null);
-
+            Request request = messageFactory.createRequest(contact.getURI(), Request.INVITE, callIdHeader, cSeqHeader, fromHeader, toHeader, viaHeaders, maxForwardsHeader);
+            request.addHeader(allowHeader);
+            request.addHeader(localContactHeader);
+            addSDPContentAndHeader(request);
+            Log.d(TAG, "Sending stateful INVITE to " + URI);
+            SipRequester requester = new SipRequester(sipProvider);
+            requester.execute(request);
+            if (requester.get().equals("Success")) {
+                // get() waits on the other thread
+                // we must wait for the request to send, but not for its response
+                // we (probably) aren't waiting long enough to lose the benefit of threading
+                sendControlMessage("Sent INVITE request");
+            } else {
+                callLock.release();
+                throw new SipException("async thread failed to send request");
+            }
         } catch (Exception e) {
-
+            callLock.release();
+            throw new SipException("couldn't send request; " + e.getMessage());
         }
-        Log.d(TAG, "calling " + URI);
+        //Log.d(TAG, "calling " + URI);
         sendControlMessage("calling " + URI);
     }
 
+    private boolean onACallNow() {
+        return callLock.availablePermits() == 0;
+    }
+
+    private void addSDPContentAndHeader(Request request) {
+        String sdp = createInviteSDPContent();
+        ContentTypeHeader typeHeader = null;
+        try {
+            typeHeader = headerFactory.createContentTypeHeader("application", "sdp");
+            request.setContent(sdp, typeHeader);
+        } catch (Exception e) {
+            // TODO do i need to handle this?
+            e.printStackTrace();
+        }
+    }
+
+    private String createInviteSDPContent() {
+        //TODO implement this
+        return " ";
+    }
+
+    /**
+     * Precondition: currently connected on a call
+     */
+    public void hangUp() {
+        // TODO send BYE if applicable
+        callLock.release();
+        sendControlMessage("hung up");
+    }
 
     @Override
     public void processRequest(RequestEvent requestEvent) {
         Request request = requestEvent.getRequest();
-        Log.d(TAG, "received a request: ");
-        Log.d(TAG, request.toString().substring(0,100));
+        Log.d(TAG, "received a request: " + request.getMethod());
+        Log.d(TAG, request.toString().substring(0, 100));
         switch (request.getMethod()) {
             case Request.OPTIONS:
                 sendOptions(request);
                 break;
             case Request.INVITE:
-                receiveCall(request);
+                receiveCall(requestEvent);
+                break;
+            case Request.BYE:
+                endCall(request);
                 break;
             default:
                 Log.d(TAG, "Not implemented yet");
@@ -351,7 +422,7 @@ public class SipClient implements SipListener {
     private void sendOptions(Request request) {
         int tag = randomGen.nextInt();
         try {
-            AllowHeader allowHeader = headerFactory.createAllowHeader(allowed_methods);
+            //AllowHeader allowHeader = headerFactory.createAllowHeader(allowed_methods);
             Response response = messageFactory.createResponse(getCurrentStatusCode(), request);
             response.addHeader(allowHeader);
             ToHeader toHeader = (ToHeader)response.getHeader("To");
@@ -372,28 +443,45 @@ public class SipClient implements SipListener {
     }
 
     private int getCurrentStatusCode() {
-        if (callLock.tryAcquire()) {
-            callLock.release();
+        if (!onACallNow()) {
             return Response.OK;
         } else {
             return Response.BUSY_HERE;
         }
     }
 
-    private void receiveCall(Request request) {
+    private void receiveCall(RequestEvent requestEvent) {
+        Dialog dialog = requestEvent.getDialog();
+        boolean available = callLock.tryAcquire();
+        if (available) {
+            // TODO prompt listener, respond 200/603, and setUpCall() if necessary
+        } else {
+            // TODO respond 486
+        }
 
+    }
+
+    /**
+     * Precondition: currently on a call, which request is trying to end
+     * @param request
+     */
+    private void endCall(Request request) {
+        // TODO do I need to do anything else to tear down the session? maybe close the RTP streams once I have them
+        callLock.release();
     }
 
     @Override
     public void processResponse(ResponseEvent responseEvent) {
         Response response = responseEvent.getResponse();
-        //Log.d(TAG, "received a response: ");
-        //Log.d(TAG, response.toString().substring(0,100));
         int responseCode = responseEvent.getResponse().getStatusCode();
+        Log.d(TAG, "received a response: " + responseCode);
+        //Log.d(TAG, response.toString().substring(0,100));
         if (responseCode >= 300) {
             sendControlMessage("SIP error: " + responseCode);
+            handleFailure(responseEvent);
         } else if (responseCode >= 200) {
             sendControlMessage("SIP OK");
+            handleSuccess(responseEvent);
         } else {
             if (responseCode == Response.RINGING) {
                 sendControlMessage("Ringing...");
@@ -402,25 +490,90 @@ public class SipClient implements SipListener {
         }
     }
 
+    private void handleFailure(ResponseEvent responseEvent) {
+        //Dialog dialog = responseEvent.getDialog();
+        Response response = responseEvent.getResponse();
+        if (isInviteResponse(responseEvent)) {
+            switch (response.getStatusCode()) {
+                case Response.BUSY_HERE:
+                    notifySessionFailed("busy");
+                    break;
+                case Response.DECLINE:
+                    notifySessionFailed("call declined");
+                    break;
+                case Response.NOT_ACCEPTABLE:
+                    notifySessionFailed("callee doesn't support RTT");
+                    break;
+                default:
+                    notifySessionFailed("call failed");
+                    break;
+            }
+            hangUp();
+        }
+        //if (onACallNow() && dialog != null)
+        //     hangUp();
+    }
+
+    private boolean isInviteResponse(ResponseEvent responseEvent) {
+        Response response = responseEvent.getResponse();
+        String inResponseTo = response.getHeader("CSeq").toString();
+        if (inResponseTo.contains("INVITE"))
+            return true;
+        return false;
+    }
+
+    private void handleSuccess(ResponseEvent responseEvent) {
+        Response response = responseEvent.getResponse();
+        Dialog dialog = responseEvent.getDialog();
+        if (isInviteResponse(responseEvent))
+            handleInviteSuccess(responseEvent);
+
+    }
+
+    private void handleInviteSuccess(ResponseEvent responseEvent) {
+        Response response = responseEvent.getResponse();
+        Dialog dialog = responseEvent.getDialog();
+        CSeqHeader cseq = (CSeqHeader)response.getHeader("CSeq");
+        long seqNo = cseq.getSeqNumber();
+        AckSender acknowledger = new AckSender(dialog);
+        acknowledger.doInBackground(seqNo);
+        if (sessionIsAcceptable(response))
+            setUpCall(responseEvent);
+        else
+            sendBye(dialog);
+    }
+
+    private boolean sessionIsAcceptable(Response response) {
+        // TODO implement this
+        return true;
+    }
+
+    private void setUpCall(ResponseEvent responseEvent) {
+        // TODO set up RTP session
+    }
+
+    private void sendBye(Dialog dialog) {
+
+    }
 
     @Override
     public void processTimeout(TimeoutEvent timeoutEvent) {
-        Log.d(TAG, "received a Timeout message");
+        //Log.d(TAG, "received a Timeout message");
     }
 
     @Override
     public void processIOException(IOExceptionEvent ioExceptionEvent) {
-        Log.d(TAG, "received a IOException message: " + ioExceptionEvent.toString());
+        //Log.d(TAG, "received a IOException message: " + ioExceptionEvent.toString());
     }
 
     @Override
     public void processTransactionTerminated(TransactionTerminatedEvent transactionTerminatedEvent) {
-        Log.d(TAG, "received a TransactionTerminated message: " + transactionTerminatedEvent.toString());
+        //Log.d(TAG, "received a TransactionTerminated message: " + transactionTerminatedEvent.toString());
     }
 
     @Override
     public void processDialogTerminated(DialogTerminatedEvent dialogTerminatedEvent) {
-        Log.d(TAG, "received a DialogTerminated message");
+        //Log.d(TAG, "received a DialogTerminated message");
     }
 
     // these nested classes are used to fire one-off threads and then die
@@ -471,6 +624,25 @@ public class SipClient implements SipListener {
                 e.printStackTrace();
                 return null;
             }
+        }
+    }
+    private class AckSender extends AsyncTask<Long, String, String> {
+        private Dialog dialog;
+        public AckSender(Dialog dialog) {
+            this.dialog = dialog;
+        }
+
+        @Override
+        protected String doInBackground(Long... params) {
+            try {
+                Request ack = dialog.createAck(params[0]);
+                dialog.sendAck(ack);
+            } catch (InvalidArgumentException e) {
+                e.printStackTrace();
+            } catch (SipException e) {
+                e.printStackTrace();
+            }
+            return null;
         }
     }
 }

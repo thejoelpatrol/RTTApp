@@ -58,6 +58,7 @@ public class RTTRegistrationActivity extends AppCompatActivity implements TextLi
     @Override
     protected void onStop() {
         super.onStop();
+        texter.removeTextReceiver(this);
     }
 
     @Override

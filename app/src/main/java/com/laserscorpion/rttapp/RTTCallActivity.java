@@ -11,7 +11,7 @@ import android.widget.TextView;
 import java.text.ParseException;
 
 
-public class RTTCallActivity extends AppCompatActivity implements TextListener {
+public class RTTCallActivity extends AppCompatActivity implements TextListener, SessionListener {
     public static final String TAG = "RTTCallActivity";
     private SipClient texter;
     private String contact_URI;
@@ -27,6 +27,7 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener {
         view.setMovementMethod(new ScrollingMovementMethod());
         texter = SipClient.getInstance();
         texter.addTextReceiver(this);
+        texter.addSessionListener(this);
         contact_URI = getIntent().getStringExtra("com.laserscorpion.rttapp.contact_uri");
     }
 
@@ -53,13 +54,19 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        texter.hangUp();
     }
 
 
-    private void addText(String text) {
-        TextView view = (TextView)findViewById(R.id.textview);
+    private void addText(final String text) {
+        final TextView view = (TextView)findViewById(R.id.textview);
         //String currentText = view.getText().toString();
-        view.append(text);
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                view.append(text);
+            }
+        });
     }
 
     @Override
@@ -70,6 +77,26 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener {
     @Override
     public void RTTextReceived(String text) {
         addText(text);
+    }
+
+    @Override
+    public void SessionEstablished() {
+
+    }
+
+    @Override
+    public void SessionClosed() {
+
+    }
+
+    @Override
+    public void SessionFailed(String reason) {
+        addText("Failed to establish call: " + reason); // TODO replace with dialog
+        try {
+            Thread.sleep(2000,0);
+        } catch (InterruptedException e) {
+        }
+        finish();
     }
 }
 
