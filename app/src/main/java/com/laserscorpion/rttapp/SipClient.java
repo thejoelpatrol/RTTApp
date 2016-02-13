@@ -63,8 +63,13 @@ public class SipClient implements SipListener {
     private String registrationID;
     private List<TextListener> messageReceivers;
     private List<SessionListener> sessionReceivers;
+    private CallReceiver callReceiver;
     private SecureRandom randomGen;
+
     private Semaphore callLock;
+    private RTTCall incomingCall;
+    private RTTCall connectedCall;
+    private RTTCall outgoingCall;
 
     /**
      * Initializes the SipClient to prepare it to register with a server and make calls. Must be called
@@ -228,6 +233,20 @@ public class SipClient implements SipListener {
         messageReceivers.add(newReceiver);
     }
 
+    /**
+     * Register some object as interested in listening for incoming calls. It becomes
+     * the listener's job to accept or decline a call when one arrives.
+     * @param receiver the CallReceiver who should be notified when a call comes in.
+     *                 There can only be one receiver listening for this message at a time.
+     */
+    public void registerCallReceiver(CallReceiver receiver) {
+        callReceiver = receiver;
+    }
+
+    /**
+     *
+     * @param receiver the TextReceiver that should no longer receive text messages
+     */
     public void removeTextReceiver(TextListener receiver) {
         if (messageReceivers.contains(receiver))
             messageReceivers.remove(receiver);
@@ -410,7 +429,11 @@ public class SipClient implements SipListener {
             case Request.INVITE:
                 receiveCall(requestEvent);
                 break;
+            case Request.ACK:
+                Log.d(TAG, "Not implemented yet");
+                break;
             case Request.BYE:
+                Log.d(TAG, "Not implemented yet");
                 endCall(request);
                 break;
             default:
@@ -450,15 +473,105 @@ public class SipClient implements SipListener {
         }
     }
 
+    private boolean isRinging() {
+        return (incomingCall != null);
+    }
+
+
+    /**
+     * Precondition: a CallReceiver has been notified that a call is coming in
+     * @throws IllegalStateException if there is no call waiting to be accepted (possibly because it already hung up)
+     */
+    /*
+        Precondition: callLock is locked, and incomingCall has a copy of the request.
+        If a call is truly coming in, these should be satisfied.
+     */
+    public void acceptCall() throws IllegalStateException {
+        if (incomingCall == null)
+            throw new IllegalStateException("no call to accept");
+
+        int tag = randomGen.nextInt();
+        Request request = incomingCall.incomingRequest.getRequest();
+        try {
+            Response response = messageFactory.createResponse(Response.OK, request);
+            ToHeader toHeader = (ToHeader)response.getHeader("To");
+            toHeader.setTag(String.valueOf(tag));
+            addSDPContentAndHeader(request);
+            response.removeHeader("To");
+            response.addHeader(toHeader);
+            response.addHeader(localContactHeader);
+            /*if (request.getHeader("Accept") != null) {
+                // TODO send the message body that this request is demanding
+            }*/
+            SipResponder responder = new SipResponder(sipProvider);
+            responder.execute(request, response);
+        } catch (Exception e) {
+            // again, this is a lot of exceptions to catch all at once. oh well...
+            // TODO handle this
+            e.printStackTrace();
+        }
+
+        connectedCall = incomingCall;
+        incomingCall = null;
+
+
+    }
+
+    public void declineCall() throws IllegalStateException {
+        Request request = incomingCall.incomingRequest.getRequest();
+        respondGeneric(request, Response.BUSY_HERE);
+        incomingCall = null;
+        callLock.release();
+    }
+
     private void receiveCall(RequestEvent requestEvent) {
+        //Log.d(TAG, "receiving a call...");
         Dialog dialog = requestEvent.getDialog();
         boolean available = callLock.tryAcquire();
         if (available) {
+            if (isRinging()) {
+                respondGeneric(requestEvent.getRequest(), Response.RINGING);
+                //respondRinging(requestEvent);
+                return;
+            }
+            Log.d(TAG, "we're available...");
             // TODO prompt listener, respond 200/603, and setUpCall() if necessary
+            if (callReceiver != null) {
+                Log.d(TAG, "asking receiver to accept...");
+                //respondGeneric(requestEvent.getRequest(), Response.RINGING);
+                incomingCall = new RTTCall(requestEvent);
+                callReceiver.callReceived();
+            } else {
+                // TODO respond 4xx
+                callLock.release();
+            }
         } else {
-            // TODO respond 486
+            Log.d(TAG, "this is the problem, right?");
+            respondGeneric(requestEvent.getRequest(), Response.BUSY_HERE);
         }
+    }
 
+    private void respondGeneric(Request request, int sipResponse) {
+        Log.d(TAG, "sending generic response: " + sipResponse);
+        int tag = randomGen.nextInt();
+        try {
+            Response response = messageFactory.createResponse(sipResponse, request);
+            ToHeader toHeader = (ToHeader)response.getHeader("To");
+            toHeader.setTag(String.valueOf(tag));
+            response.removeHeader("To");
+            response.addHeader(toHeader);
+            response.addHeader(localContactHeader);
+            SipResponder responder = new SipResponder(sipProvider);
+            responder.execute(request, response);
+        } catch (Exception e) {
+            // again, this is a lot of exceptions to catch all at once. oh well...
+            // TODO handle this
+            e.printStackTrace();
+        }
+    }
+
+    private void respondRinging(RequestEvent requestEvent) {
+        // TODO implement this
     }
 
     /**
@@ -530,6 +643,9 @@ public class SipClient implements SipListener {
 
     }
 
+    /*
+        Preconditions: callLock is held, outgoingCall is not null
+     */
     private void handleInviteSuccess(ResponseEvent responseEvent) {
         Response response = responseEvent.getResponse();
         Dialog dialog = responseEvent.getDialog();
@@ -537,10 +653,16 @@ public class SipClient implements SipListener {
         long seqNo = cseq.getSeqNumber();
         AckSender acknowledger = new AckSender(dialog);
         acknowledger.doInBackground(seqNo);
-        if (sessionIsAcceptable(response))
+        if (sessionIsAcceptable(response)) {
             setUpCall(responseEvent);
-        else
+            connectedCall = outgoingCall;
+            outgoingCall = null;
+        } else {
+            // TODO send NOT_ACCEPTABLE
             sendBye(dialog);
+            outgoingCall = null;
+        }
+
     }
 
     private boolean sessionIsAcceptable(Response response) {
@@ -577,55 +699,6 @@ public class SipClient implements SipListener {
     }
 
     // these nested classes are used to fire one-off threads and then die
-    private class SipRequester extends AsyncTask<Request, String, String> {
-        private static final String TAG = "BACKGROUND";
-        private SipProvider sipProvider;
-
-        public SipRequester(SipProvider provider) {
-            sipProvider = provider;
-        }
-
-        @Override
-        protected String doInBackground(Request... requests) {
-            try {
-                ClientTransaction transaction = sipProvider.getNewClientTransaction(requests[0]);
-                transaction.sendRequest();
-                return "Success";
-            } catch (SipException e) {
-                Log.e(TAG, "the request still failed. UGH");
-                e.printStackTrace();
-                return null;
-            }
-        }
-    }
-    private class SipResponder extends AsyncTask<Message, String, String> {
-        private static final String TAG = "BACKGROUND";
-        private SipProvider sipProvider;
-
-        public SipResponder(SipProvider provider) {
-            sipProvider = provider;
-        }
-
-        /**
-         *
-         * @param messages must be exactly 2 Messages, a Request and a Response, in that order
-         * @return
-         */
-        @Override
-        protected String doInBackground(Message... messages) {
-            Request request = (Request)messages[0];
-            Response response = (Response)messages[1];
-            try {
-                ServerTransaction transaction = sipProvider.getNewServerTransaction(request);
-                transaction.sendResponse(response);
-                return "Success";
-            } catch (Exception e) {
-                Log.e(TAG, "the response failed. UGH");
-                e.printStackTrace();
-                return null;
-            }
-        }
-    }
     private class AckSender extends AsyncTask<Long, String, String> {
         private Dialog dialog;
         public AckSender(Dialog dialog) {

@@ -17,7 +17,7 @@ import android.widget.TextView;
 import java.text.ParseException;
 
 
-public class RTTRegistrationActivity extends AppCompatActivity implements TextListener {
+public class RTTRegistrationActivity extends AppCompatActivity implements TextListener, CallReceiver {
     public static final String TAG = "RTTRegistrationActivity";
     private String REGISTRAR_PREF_NAME; // these are basically constants
     private String USERNAME_PREF_NAME; // but you can't access xml resources statically
@@ -47,6 +47,7 @@ public class RTTRegistrationActivity extends AppCompatActivity implements TextLi
             // TODO prevent anything else from being attempted - kill the activity
         }
         texter = SipClient.getInstance();
+        texter.registerCallReceiver(this);
     }
 
     @Override
@@ -137,7 +138,17 @@ public class RTTRegistrationActivity extends AppCompatActivity implements TextLi
         intent.putExtra("com.laserscorpion.rttapp.contact_uri", contact);
         startActivity(intent);
         //texter.call(contact);
+        try {
+            texter.call(contact);
+        } catch (ParseException e) {
+            addText("Invalid contact address: " + contact);
+        } catch (TransactionUnavailableException e) {
+            addText("Can't call right now - SIP stack busy");
+        } catch (android.javax.sip.SipException e) {
+            addText("Call failed: " + e.getMessage());
+        }
     }
+
 
 
 
@@ -149,6 +160,12 @@ public class RTTRegistrationActivity extends AppCompatActivity implements TextLi
     @Override
     public void RTTextReceived(String text) {
 
+    }
+
+    @Override
+    public void callReceived(/*RTTCall incomingCall*/) {
+        Intent intent = new Intent(this, IncomingCallActivity.class);
+        startActivity(intent);
     }
 }
 

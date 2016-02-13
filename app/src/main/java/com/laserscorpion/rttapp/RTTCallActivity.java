@@ -14,7 +14,7 @@ import java.text.ParseException;
 public class RTTCallActivity extends AppCompatActivity implements TextListener, SessionListener {
     public static final String TAG = "RTTCallActivity";
     private SipClient texter;
-    private String contact_URI;
+    //private String contact_URI;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -28,22 +28,12 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
         texter = SipClient.getInstance();
         texter.addTextReceiver(this);
         texter.addSessionListener(this);
-        contact_URI = getIntent().getStringExtra("com.laserscorpion.rttapp.contact_uri");
+        //contact_URI = getIntent().getStringExtra("com.laserscorpion.rttapp.contact_uri");
     }
 
     @Override
     protected void onStart() {
         super.onStart();
-        try {
-            texter.call(contact_URI);
-        } catch (ParseException e) {
-            addText("Invalid contact address: " + contact_URI);
-        } catch (TransactionUnavailableException e) {
-            addText("Can't call right now - SIP stack busy");
-        } catch (android.javax.sip.SipException e) {
-            addText("Call failed: " + e.getMessage());
-        }
-
     }
 
     @Override
