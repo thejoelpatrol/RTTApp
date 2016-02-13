@@ -2,6 +2,7 @@ package com.laserscorpion.rttapp;
 
 import android.javax.sip.Dialog;
 import android.javax.sip.RequestEvent;
+import android.javax.sip.message.Request;
 
 /**
  * Created by joel on 2/12/16.
@@ -20,6 +21,14 @@ public class RTTCall {
         this.dialog = requestEvent.getDialog();
         sipClient = SipClient.getInstance();
         incomingRequest = requestEvent;
+    }
+
+    public boolean equals(RTTCall otherCall) {
+        Request existingRequest = incomingRequest.getRequest();
+        Request newRequest = incomingRequest.getRequest();
+        if (newRequest.equals(existingRequest))
+            return true;
+        return false;
     }
 
     public void accept() {

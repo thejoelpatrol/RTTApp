@@ -424,7 +424,7 @@ public class SipClient implements SipListener {
         Log.d(TAG, request.toString().substring(0, 100));
         switch (request.getMethod()) {
             case Request.OPTIONS:
-                sendOptions(request);
+                sendOptions(requestEvent);
                 break;
             case Request.INVITE:
                 receiveCall(requestEvent);
@@ -442,8 +442,9 @@ public class SipClient implements SipListener {
         }
     }
 
-    private void sendOptions(Request request) {
+    private void sendOptions(RequestEvent requestEvent) {
         int tag = randomGen.nextInt();
+        Request request = requestEvent.getRequest();
         try {
             //AllowHeader allowHeader = headerFactory.createAllowHeader(allowed_methods);
             Response response = messageFactory.createResponse(getCurrentStatusCode(), request);
@@ -455,8 +456,8 @@ public class SipClient implements SipListener {
             if (request.getHeader("Accept") != null) {
                 // TODO send the message body that this request is demanding
             }
-            SipResponder responder = new SipResponder(sipProvider);
-            responder.execute(request, response);
+            SipResponder responder = new SipResponder(sipProvider, requestEvent);
+            responder.execute(response);
         } catch (Exception e) {
             // again, this is a lot of exceptions to catch all at once. oh well...
             // TODO handle this
@@ -503,8 +504,8 @@ public class SipClient implements SipListener {
             /*if (request.getHeader("Accept") != null) {
                 // TODO send the message body that this request is demanding
             }*/
-            SipResponder responder = new SipResponder(sipProvider);
-            responder.execute(request, response);
+            SipResponder responder = new SipResponder(sipProvider, incomingCall.incomingRequest);
+            responder.execute(response);
         } catch (Exception e) {
             // again, this is a lot of exceptions to catch all at once. oh well...
             // TODO handle this
@@ -519,7 +520,7 @@ public class SipClient implements SipListener {
 
     public void declineCall() throws IllegalStateException {
         Request request = incomingCall.incomingRequest.getRequest();
-        respondGeneric(request, Response.BUSY_HERE);
+        respondGeneric(incomingCall.incomingRequest, request, Response.BUSY_HERE);
         incomingCall = null;
         callLock.release();
     }
@@ -530,7 +531,7 @@ public class SipClient implements SipListener {
         boolean available = callLock.tryAcquire();
         if (available) {
             if (isRinging()) {
-                respondGeneric(requestEvent.getRequest(), Response.RINGING);
+                respondGeneric(requestEvent, requestEvent.getRequest(), Response.RINGING);
                 //respondRinging(requestEvent);
                 return;
             }
@@ -547,11 +548,14 @@ public class SipClient implements SipListener {
             }
         } else {
             Log.d(TAG, "this is the problem, right?");
-            respondGeneric(requestEvent.getRequest(), Response.BUSY_HERE);
+            RTTCall latestCall = new RTTCall(requestEvent);
+            if (incomingCall.equals(latestCall)) // asterisk sends many duplicate invites
+                return;
+            respondGeneric(requestEvent, requestEvent.getRequest(), Response.BUSY_HERE);
         }
     }
 
-    private void respondGeneric(Request request, int sipResponse) {
+    private void respondGeneric(RequestEvent requestEvent, Request request, int sipResponse) {
         Log.d(TAG, "sending generic response: " + sipResponse);
         int tag = randomGen.nextInt();
         try {
@@ -561,8 +565,8 @@ public class SipClient implements SipListener {
             response.removeHeader("To");
             response.addHeader(toHeader);
             response.addHeader(localContactHeader);
-            SipResponder responder = new SipResponder(sipProvider);
-            responder.execute(request, response);
+            SipResponder responder = new SipResponder(sipProvider, requestEvent);
+            responder.execute(response);
         } catch (Exception e) {
             // again, this is a lot of exceptions to catch all at once. oh well...
             // TODO handle this
