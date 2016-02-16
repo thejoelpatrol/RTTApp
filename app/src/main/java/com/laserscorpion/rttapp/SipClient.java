@@ -7,19 +7,13 @@ import android.javax.sip.header.*;
 import android.javax.sip.message.*;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
-import android.net.sip.*;
 import android.os.AsyncTask;
 import android.text.TextUtils;
 import android.util.Log;
 import android.javax.sip.*;
 
-import org.w3c.dom.Text;
-
-import java.io.Serializable;
-import java.lang.reflect.Constructor;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
-import java.net.Socket;
 import java.net.SocketException;
 import java.security.SecureRandom;
 import java.text.ParseException;
@@ -27,8 +21,8 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Properties;
-import java.util.Random;
 import java.util.concurrent.Semaphore;
 
 
@@ -40,6 +34,7 @@ public class SipClient implements SipListener {
     private static final String TAG = "SipClient";
     private static final int MAX_FWDS = 70;
     private static final int DEFAULT_REGISTRATION_LEN = 600;
+    private static final int CALL_RINGING_TIME = 30;
     private static final String ALLOWED_METHODS[] = {Request.ACK, Request.BYE, Request.INVITE, Request.OPTIONS};
     private android.content.Context parent;
     private SipFactory sipFactory;
@@ -66,7 +61,15 @@ public class SipClient implements SipListener {
     private CallReceiver callReceiver;
     private SecureRandom randomGen;
 
-    private Semaphore callLock;
+    /*  Unconventional locking rules:
+        1) callCreationLock must be held by SOMEONE before trying to acquire callDestructionLock.
+        2) callDestructionLock must never be used with acquire(), only tryAcquire()
+           If it can't be acquired, someone is already trying to destroy it, so move on.
+        3) release callCreationLock before acquiring callDestructionLock
+        These suck, this is too complicated. TODO: change this, probably abstract it away into RTTCall
+     */
+    private Semaphore callCreationLock;
+    private Semaphore callDestructionLock;
     private RTTCall incomingCall;
     private RTTCall connectedCall;
     private RTTCall outgoingCall;
@@ -105,7 +108,8 @@ public class SipClient implements SipListener {
         messageReceivers.add(listener);
         sessionReceivers = new LinkedList<SessionListener>();
         randomGen = new SecureRandom();
-        callLock = new Semaphore(1);
+        callCreationLock = new Semaphore(1);
+        callDestructionLock = new Semaphore(1);
         //allowed_methods = TextUtils.join(", ", ALLOWED_METHODS);
         finishInit();
     }
@@ -250,14 +254,17 @@ public class SipClient implements SipListener {
     public void removeTextReceiver(TextListener receiver) {
         if (messageReceivers.contains(receiver))
             messageReceivers.remove(receiver);
-        /*for (TextListener listener : messageReceivers) {
-            if (listener == receiver)
-                messageReceivers.remove(listener);
-        }*/
     }
 
     public void addSessionListener(SessionListener newListener) {
+        if (sessionReceivers.contains(newListener))
+            return;
         sessionReceivers.add(newListener);
+
+    }
+    public void removeSessionListener(SessionListener existingListener) {
+        if (sessionReceivers.contains(existingListener))
+            sessionReceivers.remove(existingListener);
     }
     private void sendControlMessage(String message) {
         for (TextListener listener : messageReceivers) {
@@ -274,6 +281,11 @@ public class SipClient implements SipListener {
     private void notifySessionFailed(String reason) {
         for (SessionListener listener : sessionReceivers) {
             listener.SessionFailed(reason);
+        }
+    }
+    private void notifySessionClosed() {
+        for (SessionListener listener : sessionReceivers) {
+            listener.SessionClosed();
         }
     }
 
@@ -351,7 +363,7 @@ public class SipClient implements SipListener {
     }
 
     public void call(String URI) throws SipException, ParseException, TransactionUnavailableException {
-        boolean available = callLock.tryAcquire();
+        boolean available = callCreationLock.tryAcquire();
         if (!available)
             throw new TransactionUnavailableException("Can't call now -- already on a call");
         Address contact = addressFactory.createAddress("sip:" + URI);
@@ -366,6 +378,8 @@ public class SipClient implements SipListener {
             Request request = messageFactory.createRequest(contact.getURI(), Request.INVITE, callIdHeader, cSeqHeader, fromHeader, toHeader, viaHeaders, maxForwardsHeader);
             request.addHeader(allowHeader);
             request.addHeader(localContactHeader);
+            ExpiresHeader expiresHeader = headerFactory.createExpiresHeader(CALL_RINGING_TIME);
+            request.addHeader(expiresHeader);
             addSDPContentAndHeader(request);
             Log.d(TAG, "Sending stateful INVITE to " + URI);
             SipRequester requester = new SipRequester(sipProvider);
@@ -376,11 +390,11 @@ public class SipClient implements SipListener {
                 // we (probably) aren't waiting long enough to lose the benefit of threading
                 sendControlMessage("Sent INVITE request");
             } else {
-                callLock.release();
+                callCreationLock.release();
                 throw new SipException("async thread failed to send request");
             }
         } catch (Exception e) {
-            callLock.release();
+            callCreationLock.release();
             throw new SipException("couldn't send request; " + e.getMessage());
         }
         //Log.d(TAG, "calling " + URI);
@@ -388,7 +402,7 @@ public class SipClient implements SipListener {
     }
 
     private boolean onACallNow() {
-        return callLock.availablePermits() == 0;
+        return callCreationLock.availablePermits() == 0;
     }
 
     private void addSDPContentAndHeader(Request request) {
@@ -408,15 +422,6 @@ public class SipClient implements SipListener {
         return " ";
     }
 
-    /**
-     * Precondition: currently connected on a call
-     */
-    public void hangUp() {
-        // TODO send BYE if applicable
-        callLock.release();
-        sendControlMessage("hung up");
-    }
-
     @Override
     public void processRequest(RequestEvent requestEvent) {
         Request request = requestEvent.getRequest();
@@ -433,8 +438,8 @@ public class SipClient implements SipListener {
                 Log.d(TAG, "Not implemented yet");
                 break;
             case Request.BYE:
-                Log.d(TAG, "Not implemented yet");
-                endCall(request);
+                //Log.d(TAG, "Not implemented yet");
+                endCall(requestEvent);
                 break;
             default:
                 Log.d(TAG, "Not implemented yet");
@@ -478,13 +483,29 @@ public class SipClient implements SipListener {
         return (incomingCall != null);
     }
 
+    /**
+     * Precondition: currently connected on a call
+     */
+    public void hangUp() {
+        /*RTTCall call;
+        if (incomingCall != null)
+            call = incomingCall;
+        else if (connectedCall != null)
+            call = connectedCall;
+        else
+            call = outgoingCall;
+        call.end();*/
+
+        //sendBye(call.getDialog());
+
+        terminateCall();
+    }
 
     /**
      * Precondition: a CallReceiver has been notified that a call is coming in
      * @throws IllegalStateException if there is no call waiting to be accepted (possibly because it already hung up)
      */
-    /*
-        Precondition: callLock is locked, and incomingCall has a copy of the request.
+    /*  Precondition: callCreationLock is locked, and incomingCall has a copy of the request.
         If a call is truly coming in, these should be satisfied.
      */
     public void acceptCall() throws IllegalStateException {
@@ -501,9 +522,9 @@ public class SipClient implements SipListener {
             response.removeHeader("To");
             response.addHeader(toHeader);
             response.addHeader(localContactHeader);
-            /*if (request.getHeader("Accept") != null) {
+            if (request.getHeader("Accept") != null) {
                 // TODO send the message body that this request is demanding
-            }*/
+            }
             SipResponder responder = new SipResponder(sipProvider, incomingCall.incomingRequest);
             responder.execute(response);
         } catch (Exception e) {
@@ -514,29 +535,38 @@ public class SipClient implements SipListener {
 
         connectedCall = incomingCall;
         incomingCall = null;
-
-
+        // TODO setUpCall() ?
     }
 
     public void declineCall() throws IllegalStateException {
-        Request request = incomingCall.incomingRequest.getRequest();
-        respondGeneric(incomingCall.incomingRequest, request, Response.BUSY_HERE);
-        incomingCall = null;
-        callLock.release();
+        if (incomingCall == null)
+            throw new IllegalStateException("no incoming call to decline");
+        if (callDestructionLock.tryAcquire()) {
+            if (callCreationLock.availablePermits() > 0) {
+                callDestructionLock.release();
+                throw new IllegalStateException("call creation is not locked, we must not be on a call");
+            }
+            Request request = incomingCall.incomingRequest.getRequest();
+            respondGeneric(incomingCall.incomingRequest, request, Response.BUSY_HERE);
+            incomingCall = null;
+            callCreationLock.release();
+            callDestructionLock.release();
+        }
     }
 
     private void receiveCall(RequestEvent requestEvent) {
         //Log.d(TAG, "receiving a call...");
-        Dialog dialog = requestEvent.getDialog();
-        boolean available = callLock.tryAcquire();
+        //Dialog dialog = requestEvent.getDialog();
+        Log.d(TAG, "number of permits: " + callCreationLock.availablePermits());
+        boolean available = callCreationLock.tryAcquire();
         if (available) {
+            Log.d(TAG, "we're available...");
             if (isRinging()) {
+                Log.d(TAG, "wait why is this ever executing?");
                 respondGeneric(requestEvent, requestEvent.getRequest(), Response.RINGING);
                 //respondRinging(requestEvent);
                 return;
             }
-            Log.d(TAG, "we're available...");
-            // TODO prompt listener, respond 200/603, and setUpCall() if necessary
             if (callReceiver != null) {
                 Log.d(TAG, "asking receiver to accept...");
                 //respondGeneric(requestEvent.getRequest(), Response.RINGING);
@@ -544,13 +574,16 @@ public class SipClient implements SipListener {
                 callReceiver.callReceived();
             } else {
                 // TODO respond 4xx
-                callLock.release();
+                Log.d(TAG, "uh oh, we're releasing this lock...why?");
+                callCreationLock.release();
             }
         } else {
-            Log.d(TAG, "this is the problem, right?");
             RTTCall latestCall = new RTTCall(requestEvent);
-            if (incomingCall.equals(latestCall)) // asterisk sends many duplicate invites
+            if (incomingCall.equals(latestCall)) {
+                // asterisk sends many duplicate invites
+                Log.d(TAG, "ignoring a duplicate INVITE");
                 return;
+            }
             respondGeneric(requestEvent, requestEvent.getRequest(), Response.BUSY_HERE);
         }
     }
@@ -574,17 +607,34 @@ public class SipClient implements SipListener {
         }
     }
 
-    private void respondRinging(RequestEvent requestEvent) {
-        // TODO implement this
+    /**
+     * Precondition: currently on a call, which requestEvent is trying to end
+     * @param requestEvent
+     */
+    private void endCall(RequestEvent requestEvent) {
+        // TODO do I need to do anything else to tear down the session? maybe close the RTP streams once I have them
+
+        Request request = requestEvent.getRequest();
+        respondGeneric(requestEvent, request, Response.OK);
+        notifySessionClosed();
+        terminateCall();
+
+        //incomingCall = null;
+        //callCreationLock.release();
     }
 
-    /**
-     * Precondition: currently on a call, which request is trying to end
-     * @param request
-     */
-    private void endCall(Request request) {
-        // TODO do I need to do anything else to tear down the session? maybe close the RTP streams once I have them
-        callLock.release();
+    private void terminateCall() {
+        if (callDestructionLock.tryAcquire()) {
+            if (callCreationLock.availablePermits() == 0) {
+                incomingCall = null;
+                connectedCall = null;
+                outgoingCall = null;
+
+                callCreationLock.release();
+                Log.d(TAG, "ending call...number of permits: " + callCreationLock.availablePermits());
+            }
+            callDestructionLock.release();
+        }
     }
 
     @Override
@@ -648,7 +698,7 @@ public class SipClient implements SipListener {
     }
 
     /*
-        Preconditions: callLock is held, outgoingCall is not null
+        Preconditions: callCreationLock is held, outgoingCall is not null
      */
     private void handleInviteSuccess(ResponseEvent responseEvent) {
         Response response = responseEvent.getResponse();
@@ -658,12 +708,15 @@ public class SipClient implements SipListener {
         AckSender acknowledger = new AckSender(dialog);
         acknowledger.doInBackground(seqNo);
         if (sessionIsAcceptable(response)) {
+            Log.d(TAG, "acceptable!");
             setUpCall(responseEvent);
             connectedCall = outgoingCall;
             outgoingCall = null;
         } else {
             // TODO send NOT_ACCEPTABLE
-            sendBye(dialog);
+            Log.d(TAG, "not acceptable");
+            //sendAck
+            //sendBye(dialog);
             outgoingCall = null;
         }
 
@@ -671,7 +724,16 @@ public class SipClient implements SipListener {
 
     private boolean sessionIsAcceptable(Response response) {
         // TODO implement this
-        return true;
+        ListIterator<Header> list = response.getHeaders("Content-Type");
+        while (list.hasNext()) {
+            Header header = list.next();
+            if (header.getName().equals("application/sdp")) {
+                String content = (String)response.getContent();
+                if (content.contains("t140"))
+                    return true;
+            }
+        }
+        return false;
     }
 
     private void setUpCall(ResponseEvent responseEvent) {
@@ -679,7 +741,8 @@ public class SipClient implements SipListener {
     }
 
     private void sendBye(Dialog dialog) {
-
+        ByeSender bye = new ByeSender(sipProvider);
+        bye.execute(dialog);
     }
 
     @Override
@@ -722,4 +785,24 @@ public class SipClient implements SipListener {
             return null;
         }
     }
+    private class ByeSender extends AsyncTask<Dialog, String, String> {
+        SipProvider sipProvider;
+        public ByeSender(SipProvider sipProvider ) {
+            this.sipProvider = sipProvider;
+        }
+
+        @Override
+        protected String doInBackground(Dialog... dialogs) {
+            try {
+                Dialog dialog = dialogs[0];
+                Request bye = dialog.createRequest(Request.BYE);
+                ClientTransaction transaction = sipProvider.getNewClientTransaction(bye);
+                dialog.sendRequest(transaction);
+            } catch (SipException e) {
+                e.printStackTrace();
+            }
+            return null;
+        }
+    }
+
 }

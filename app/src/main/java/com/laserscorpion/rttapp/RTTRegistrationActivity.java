@@ -53,6 +53,7 @@ public class RTTRegistrationActivity extends AppCompatActivity implements TextLi
     @Override
     protected void onStart() {
         super.onStart();
+        texter.addTextReceiver(this);
         register();
     }
 

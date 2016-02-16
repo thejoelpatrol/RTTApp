@@ -23,6 +23,13 @@ public class RTTCall {
         incomingRequest = requestEvent;
     }
 
+    public RequestEvent getIncomingRequest() {
+        return incomingRequest;
+    }
+    public Dialog getDialog() {
+        return dialog;
+    }
+
     public boolean equals(RTTCall otherCall) {
         Request existingRequest = incomingRequest.getRequest();
         Request newRequest = incomingRequest.getRequest();

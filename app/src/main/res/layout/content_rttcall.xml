@@ -18,20 +18,20 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
         <Button
-            android:id="@+id/declineButton"
+            android:id="@+id/hangUpButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_alignParentTop="true"
-            android:text="Decline"
-            android:onClick="declineCall" />
+            android:text="Hang up"
+            android:onClick="hangUp" />
         <Button
-            android:id="@+id/acceptButton"
+            android:id="@+id/saveButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_alignParentTop="true"
             android:layout_toRightOf="@id/declineButton"
-            android:text="Accept"
-            android:onClick="acceptCall" />
+            android:text="Save Text"
+            android:onClick="saveText" />
     </LinearLayout>
         <TextView
             android:id="@+id/textview"

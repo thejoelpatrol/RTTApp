@@ -6,6 +6,7 @@ import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.text.method.ScrollingMovementMethod;
+import android.view.View;
 import android.widget.TextView;
 
 import java.text.ParseException;
@@ -22,9 +23,11 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
         setContentView(R.layout.activity_rttcall);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
-        getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        //getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        getSupportActionBar().setHomeButtonEnabled(false);
         TextView view = (TextView)findViewById(R.id.textview);
         view.setMovementMethod(new ScrollingMovementMethod());
+
         texter = SipClient.getInstance();
         texter.addTextReceiver(this);
         texter.addSessionListener(this);
@@ -44,7 +47,9 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        texter.hangUp();
+        //texter.hangUp();
+        texter.removeTextReceiver(this);
+        texter.removeSessionListener(this);
     }
 
 
@@ -74,16 +79,26 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
 
     }
 
+    public void hangUp(View view) {
+        texter.hangUp();
+        finish();
+    }
+
     @Override
     public void SessionClosed() {
-
+        addText("Other party hung up.\n");
+        try {
+            Thread.sleep(2000,0);
+        } catch (InterruptedException e) {
+        }
+        finish();
     }
 
     @Override
     public void SessionFailed(String reason) {
         addText("Failed to establish call: " + reason); // TODO replace with dialog
         try {
-            Thread.sleep(2000,0);
+            Thread.sleep(1000,0);
         } catch (InterruptedException e) {
         }
         finish();
