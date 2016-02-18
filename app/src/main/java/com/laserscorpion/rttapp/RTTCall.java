@@ -11,11 +11,12 @@ public class RTTCall {
     private SipClient sipClient;
     private Dialog dialog;
     public RequestEvent incomingRequest;
+    public RequestEvent outgoingRequest;
 
-    public RTTCall(Dialog dialog) {
+    /*public RTTCall(Dialog dialog) {
         this.dialog = dialog;
         sipClient = SipClient.getInstance();
-    }
+    }*/
 
     public RTTCall(RequestEvent requestEvent) {
         this.dialog = requestEvent.getDialog();
@@ -32,7 +33,7 @@ public class RTTCall {
 
     public boolean equals(RTTCall otherCall) {
         Request existingRequest = incomingRequest.getRequest();
-        Request newRequest = incomingRequest.getRequest();
+        Request newRequest = otherCall.getIncomingRequest().getRequest();
         if (newRequest.equals(existingRequest))
             return true;
         return false;

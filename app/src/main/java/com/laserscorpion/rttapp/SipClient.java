@@ -381,7 +381,7 @@ public class SipClient implements SipListener {
             ExpiresHeader expiresHeader = headerFactory.createExpiresHeader(CALL_RINGING_TIME);
             request.addHeader(expiresHeader);
             addSDPContentAndHeader(request);
-            Log.d(TAG, "Sending stateful INVITE to " + URI);
+            //Log.d(TAG, "Sending stateful INVITE to " + URI);
             SipRequester requester = new SipRequester(sipProvider);
             requester.execute(request);
             if (requester.get().equals("Success")) {
