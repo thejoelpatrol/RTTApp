@@ -6,6 +6,7 @@ import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.text.method.ScrollingMovementMethod;
+import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
 
@@ -80,6 +81,7 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
     }
 
     public void hangUp(View view) {
+        Log.d(TAG, "choosing to hang up");
         texter.hangUp();
         finish();
     }

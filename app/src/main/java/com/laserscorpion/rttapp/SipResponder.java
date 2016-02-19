@@ -29,7 +29,7 @@ public class SipResponder extends AsyncTask<Response, String, String> {
 
     /**
      *
-     * @param messages must be exactly 2 Messages, a Request and a Response, in that order
+     * @param
      * @return
      */
     @Override
