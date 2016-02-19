@@ -451,6 +451,11 @@ public class SipClient implements SipListener {
                 //Log.d(TAG, "Not implemented yet");
                 endCall(requestEvent);
                 break;
+            case Request.CANCEL:
+                //Log.d(TAG, "Not implemented yet");
+                //endCall(requestEvent);
+                cancelCall(requestEvent);
+                break;
             default:
                 Log.d(TAG, "Not implemented yet");
                 break;
@@ -497,7 +502,7 @@ public class SipClient implements SipListener {
      * Precondition: currently connected on or creating a call
      */
     public void hangUp() {
-        if (currentCall != null) {
+        if (onACallNow()) {
             if (currentCall.isCalling()) {
                 sendCancel();
                 callLock.release();
@@ -519,7 +524,7 @@ public class SipClient implements SipListener {
         If a call is truly coming in, these will be satisfied.
      */
     public void acceptCall() throws IllegalStateException {
-        if (currentCall == null)
+        if (!onACallNow())
             throw new IllegalStateException("no call to accept");
         if (callLock.availablePermits() != 0)
             throw new IllegalStateException("call state is not locked, we must not be setting up a new call");
@@ -560,8 +565,10 @@ public class SipClient implements SipListener {
         If a call is truly coming in, these will be satisfied.
      */
     public void declineCall() throws IllegalStateException {
-        if (currentCall == null)
+        if (!onACallNow())
             throw new IllegalStateException("no call to decline");
+        if (!currentCall.isRinging())
+            throw new IllegalStateException("no call ringing now");
         RequestEvent incomingRequest = currentCall.getCreationEvent();
         if (incomingRequest == null)
             throw new IllegalStateException("current call is not incoming, can't decline it");
@@ -603,7 +610,7 @@ public class SipClient implements SipListener {
             }*/
             if (callReceiver != null) {
                 Log.d(TAG, "asking receiver to accept...");
-                respondGeneric(requestEvent, requestEvent.getRequest(), Response.RINGING);
+                //respondGeneric(requestEvent, requestEvent.getRequest(), Response.RINGING);
                 //incomingCall = new RTTCall(requestEvent);
                 currentCall = new RTTCall(requestEvent);
                 currentCall.setRinging();
@@ -626,6 +633,31 @@ public class SipClient implements SipListener {
         }
     }
 
+    private void cancelCall(RequestEvent requestEvent) {
+        //respondGeneric(requestEvent, requestEvent.getRequest(), Response.OK);
+        if (currentCall.isRinging() && cancelApplies(requestEvent, currentCall)) {
+            RequestEvent initialINVITE = currentCall.getCreationEvent();
+            respondGeneric(initialINVITE, initialINVITE.getRequest(), Response.REQUEST_TERMINATED);
+            notifySessionFailed("Caller cancelled call");
+            callLock.release();
+            terminateCall();
+        }
+    }
+
+    private boolean cancelApplies(RequestEvent cancelRequest, RTTCall cancelableCall) {
+        Dialog dialog = cancelRequest.getDialog();
+        CallIdHeader cancelID = dialog.getCallId();
+        String cancelCallID = cancelID.toString();
+
+        Request callCreationRequest = cancelableCall.getCreationRequest();
+        CallIdHeader callID = (CallIdHeader)callCreationRequest.getHeader("Call-ID");
+        String checkID = callID.toString();
+
+        return cancelCallID.equals(checkID);
+    }
+
+
+    // TODO: easy - remove the Request param, it can be gotten from the RequestEvent
     private void respondGeneric(RequestEvent requestEvent, Request request, int sipResponse) {
         Log.d(TAG, "sending generic response: " + sipResponse);
         int tag = randomGen.nextInt();
@@ -663,7 +695,7 @@ public class SipClient implements SipListener {
 
     private void terminateCall() {
         callLock.acquireUninterruptibly();
-        if (currentCall != null) {
+        if (onACallNow()) {
             // multiple calls to terminateCall() may occur in quick succession due to duplicate BYEs
             // therefore we must safely check that there is still a call to end
             currentCall.end();
