@@ -388,9 +388,10 @@ public class SipClient implements SipListener {
             SipRequester requester = new SipRequester(sipProvider);
             requester.execute(request);
             currentCall = new RTTCall(request, null);
+            currentCall.setCalling();
             if (requester.get().equals("Success")) {
                 // get() waits on the other thread
-                // we must wait for the request to send, but not for its response
+                // we must confirm the request sent, but no need to wait for its response
                 // we (probably) aren't waiting long enough to lose the benefit of threading
                 sendControlMessage("Sent INVITE request");
             } else {
@@ -496,12 +497,15 @@ public class SipClient implements SipListener {
      * Precondition: currently connected on or creating a call
      */
     public void hangUp() {
-        // TODO sendBye();
         if (currentCall != null) {
-            if (currentCall.isCalling())
+            if (currentCall.isCalling()) {
                 sendCancel();
-            else
+                callLock.release();
+            }
+            else if (currentCall.isConnected())
                 sendBye(currentCall.getDialog());
+            else
+                Log.d(TAG, "Unsure what is being hung up");
         }
         terminateCall();
     }
@@ -599,7 +603,7 @@ public class SipClient implements SipListener {
             }*/
             if (callReceiver != null) {
                 Log.d(TAG, "asking receiver to accept...");
-                //respondGeneric(requestEvent.getRequest(), Response.RINGING);
+                respondGeneric(requestEvent, requestEvent.getRequest(), Response.RINGING);
                 //incomingCall = new RTTCall(requestEvent);
                 currentCall = new RTTCall(requestEvent);
                 currentCall.setRinging();

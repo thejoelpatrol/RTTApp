@@ -74,7 +74,7 @@ public class RTTCall {
         return false;*/
     }
 
-    public void call() {
+    public void setCalling() {
         calling = true;
     }
     public void setRinging() {
