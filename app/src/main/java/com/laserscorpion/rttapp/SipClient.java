@@ -423,6 +423,18 @@ public class SipClient implements SipListener {
         }
     }
 
+    private void addSDPContentAndHeader(Response response) {
+        String sdp = createInviteSDPContent();
+        ContentTypeHeader typeHeader = null;
+        try {
+            typeHeader = headerFactory.createContentTypeHeader("application", "sdp");
+            response.setContent(sdp, typeHeader);
+        } catch (Exception e) {
+            // TODO do i need to handle this?
+            e.printStackTrace();
+        }
+    }
+
     private String createInviteSDPContent() {
         //TODO implement this
         return " ";
@@ -476,7 +488,7 @@ public class SipClient implements SipListener {
             if (request.getHeader("Accept") != null) {
                 // TODO send the message body that this request is demanding
             }
-            SipResponder responder = new SipResponder(sipProvider, requestEvent);
+            SipResponder responder = new SipResponder(sipProvider, requestEvent, null);
             responder.execute(response);
         } catch (Exception e) {
             // again, this is a lot of exceptions to catch all at once. oh well...
@@ -536,16 +548,16 @@ public class SipClient implements SipListener {
         Request request = currentCall.getCreationRequest();
         try {
             Response response = messageFactory.createResponse(Response.OK, request);
-            ToHeader toHeader = (ToHeader)response.getHeader("To");
-            toHeader.setTag(String.valueOf(tag));
-            addSDPContentAndHeader(request);
-            response.removeHeader("To");
-            response.addHeader(toHeader);
+            //ToHeader toHeader = (ToHeader)response.getHeader("To");
+            //toHeader.setTag(String.valueOf(tag));
+            addSDPContentAndHeader(response);
+            //response.removeHeader("To");
+            //response.addHeader(toHeader);
             response.addHeader(localContactHeader);
             if (request.getHeader("Accept") != null) {
                 // TODO send the message body that this request is demanding
             }
-            SipResponder responder = new SipResponder(sipProvider, incomingEvent);
+            SipResponder responder = new SipResponder(sipProvider, incomingEvent, currentCall.getInviteTransaction());
             responder.execute(response);
             currentCall.accept();
         } catch (Exception e) {
@@ -576,7 +588,7 @@ public class SipClient implements SipListener {
             throw new IllegalStateException("call state is not locked, we must not be receiving a call");
 
         Request request = incomingRequest.getRequest();
-        respondGeneric(incomingRequest, request, Response.BUSY_HERE);
+        respondGeneric(incomingRequest, currentCall.getInviteTransaction(), Response.BUSY_HERE);
         currentCall.end();
         currentCall = null;
         callLock.release();
@@ -610,9 +622,9 @@ public class SipClient implements SipListener {
             }*/
             if (callReceiver != null) {
                 Log.d(TAG, "asking receiver to accept...");
-                //respondGeneric(requestEvent, requestEvent.getRequest(), Response.RINGING);
+                ServerTransaction transaction = respondGeneric(requestEvent, null, Response.RINGING);
                 //incomingCall = new RTTCall(requestEvent);
-                currentCall = new RTTCall(requestEvent);
+                currentCall = new RTTCall(requestEvent, transaction);
                 currentCall.setRinging();
                 callReceiver.callReceived();
             } else {
@@ -623,13 +635,13 @@ public class SipClient implements SipListener {
         } else {
             if (lockAvailable)
                 callLock.release(); // we just acquired this, but can't use it after all
-            RTTCall latestCall = new RTTCall(requestEvent);
+            RTTCall latestCall = new RTTCall(requestEvent, null);
             if (currentCall.equals(latestCall)) {
                 // asterisk sends many duplicate invites
                 Log.d(TAG, "ignoring a duplicate INVITE");
                 return;
             }
-            respondGeneric(requestEvent, requestEvent.getRequest(), Response.BUSY_HERE);
+            respondGeneric(requestEvent, null, Response.BUSY_HERE);
         }
     }
 
@@ -637,7 +649,7 @@ public class SipClient implements SipListener {
         //respondGeneric(requestEvent, requestEvent.getRequest(), Response.OK);
         if (currentCall.isRinging() && cancelApplies(requestEvent, currentCall)) {
             RequestEvent initialINVITE = currentCall.getCreationEvent();
-            respondGeneric(initialINVITE, initialINVITE.getRequest(), Response.REQUEST_TERMINATED);
+            respondGeneric(initialINVITE, initialINVITE.getServerTransaction(), Response.REQUEST_TERMINATED);
             notifySessionFailed("Caller cancelled call");
             callLock.release();
             terminateCall();
@@ -657,23 +669,25 @@ public class SipClient implements SipListener {
     }
 
 
-    // TODO: easy - remove the Request param, it can be gotten from the RequestEvent
-    private void respondGeneric(RequestEvent requestEvent, Request request, int sipResponse) {
+    private ServerTransaction respondGeneric(RequestEvent requestEvent, ServerTransaction existingTransaction, int sipResponse) {
         Log.d(TAG, "sending generic response: " + sipResponse);
         int tag = randomGen.nextInt();
         try {
-            Response response = messageFactory.createResponse(sipResponse, request);
+            Response response = messageFactory.createResponse(sipResponse, requestEvent.getRequest());
             ToHeader toHeader = (ToHeader)response.getHeader("To");
             toHeader.setTag(String.valueOf(tag));
             response.removeHeader("To");
             response.addHeader(toHeader);
             response.addHeader(localContactHeader);
-            SipResponder responder = new SipResponder(sipProvider, requestEvent);
+            SipResponder responder = new SipResponder(sipProvider, requestEvent, existingTransaction);
             responder.execute(response);
+            ServerTransaction transaction = responder.get();
+            return transaction;
         } catch (Exception e) {
             // again, this is a lot of exceptions to catch all at once. oh well...
             // TODO handle this
             e.printStackTrace();
+            return null;
         }
     }
 
@@ -685,7 +699,7 @@ public class SipClient implements SipListener {
         // TODO do I need to do anything else to tear down the session? maybe close the RTP streams once I have them
 
         Request request = requestEvent.getRequest();
-        respondGeneric(requestEvent, request, Response.OK);
+        respondGeneric(requestEvent, null, Response.OK);
         notifySessionClosed();
         terminateCall();
 
@@ -839,12 +853,14 @@ public class SipClient implements SipListener {
     }*/
 
     private void sendBye(Dialog dialog) {
+        Log.d(TAG, "sending BYE");
         ByeSender bye = new ByeSender(sipProvider);
         bye.execute(dialog);
     }
 
     private void sendCancel() {
         // TODO implement this, which is probably nontrivial
+        Log.d(TAG, "(Not actually) sending CANCEL");
     }
 
     @Override

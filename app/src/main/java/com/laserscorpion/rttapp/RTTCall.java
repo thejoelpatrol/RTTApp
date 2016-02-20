@@ -2,6 +2,7 @@ package com.laserscorpion.rttapp;
 
 import android.javax.sip.Dialog;
 import android.javax.sip.RequestEvent;
+import android.javax.sip.ServerTransaction;
 import android.javax.sip.message.Request;
 
 import java.util.concurrent.Semaphore;
@@ -15,6 +16,7 @@ public class RTTCall {
     private Request creationRequest;
 
     private RequestEvent incomingRequest;
+    private ServerTransaction inviteTransaction;
 
     private Semaphore creationLock;
     private Semaphore destructionLock;
@@ -27,18 +29,44 @@ public class RTTCall {
         sipClient = SipClient.getInstance();
     }*/
 
-    public RTTCall(RequestEvent requestEvent) {
+    /**
+     * Use this constructor for an incoming call - the requestEvent is the INVITE,
+     * the transaction is the ServerTransaction used to respond to the INVITE,
+     * for both 180 Ringing and the final response. If planning to send 180 Ringing,
+     * it must be sent already, so the ServerTransaction can be used here.
+     * @param requestEvent the incoming INVITE event
+     * @param transaction used to send 180 Ringing, and the final response. null if no 180 has been
+     *                    sent yet and therefore no transaction is used yet. In that case, only
+     *                    one response can be sent,
+     */
+    public RTTCall(RequestEvent requestEvent, ServerTransaction transaction) {
         //this.dialog = requestEvent.getDialog();
         //sipClient = SipClient.getInstance();
         this(requestEvent.getRequest(), requestEvent.getDialog());
         incomingRequest = requestEvent;
+        inviteTransaction = transaction;
     }
 
+    /**
+     * Use this constructor for an outgoing call. Ideally you will pass in the dialog that is
+     * created for the call, but this may not be available yet,
+     * so you will need to call addDialog() in that case.
+     * @param creationRequest the INVITE Request sent to the other party to initiate the call
+     * @param dialog
+     */
     public RTTCall(Request creationRequest, Dialog dialog) {
         this.creationRequest = creationRequest;
         this.dialog = dialog;
         sipClient = SipClient.getInstance();
         destructionLock = new Semaphore(1);
+    }
+
+    /**
+     *
+     * @return the transaction used to respond to the original INVITE, or null if none
+     */
+    public ServerTransaction getInviteTransaction() {
+        return inviteTransaction;
     }
 
     /**

@@ -17,14 +17,16 @@ import android.util.Log;
 /**
  * fires a one-off response in another thread and dies
  */
-public class SipResponder extends AsyncTask<Response, String, String> {
+public class SipResponder extends AsyncTask<Response, String, ServerTransaction> {
     private static final String TAG = "BACKGROUND";
     private SipProvider sipProvider;
     private RequestEvent requestEvent;
+    private ServerTransaction transaction;
 
-    public SipResponder(SipProvider provider, RequestEvent event) {
+    public SipResponder(SipProvider provider, RequestEvent event, ServerTransaction transaction) {
         sipProvider = provider;
         requestEvent = event;
+        this.transaction = transaction;
     }
 
     /**
@@ -33,7 +35,7 @@ public class SipResponder extends AsyncTask<Response, String, String> {
      * @return
      */
     @Override
-    protected String doInBackground(Response... responses) {
+    protected ServerTransaction doInBackground(Response... responses) {
         Request request = requestEvent.getRequest();
         Response response = (Response)responses[0];
 
@@ -45,15 +47,15 @@ public class SipResponder extends AsyncTask<Response, String, String> {
             ServerTransaction transaction = (SIPServerTransaction)stack.findTransaction((SIPMessage)response, true);*/
 
             //ServerTransaction transaction = sipProvider.getNewServerTransaction(request);
-
-            ServerTransaction transaction = requestEvent.getServerTransaction();
+            if (transaction == null)
+                transaction = requestEvent.getServerTransaction();
             if (transaction == null) {
                 //Log.d(TAG, "server transaction: " + transaction);
                 transaction = sipProvider.getNewServerTransaction(request);
             }
 
             transaction.sendResponse(response);
-            return "Success";
+            return transaction;
         } catch (TransactionAlreadyExistsException e) {
             Log.e(TAG, "that race condition. UGH");
             e.printStackTrace();
