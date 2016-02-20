@@ -24,11 +24,6 @@ public class RTTCall {
     private boolean connected;
     private boolean calling;
 
-    /*public RTTCall(Dialog dialog) {
-        this.dialog = dialog;
-        sipClient = SipClient.getInstance();
-    }*/
-
     /**
      * Use this constructor for an incoming call - the requestEvent is the INVITE,
      * the transaction is the ServerTransaction used to respond to the INVITE,
@@ -40,8 +35,6 @@ public class RTTCall {
      *                    one response can be sent,
      */
     public RTTCall(RequestEvent requestEvent, ServerTransaction transaction) {
-        //this.dialog = requestEvent.getDialog();
-        //sipClient = SipClient.getInstance();
         this(requestEvent.getRequest(), requestEvent.getDialog());
         incomingRequest = requestEvent;
         inviteTransaction = transaction;
@@ -94,12 +87,8 @@ public class RTTCall {
     }
 
     public boolean equals(RTTCall otherCall) {
-        //Request existingRequest = incomingRequest.getRequest();
         Request newRequest = otherCall.getCreationRequest();
         return newRequest.equals(creationRequest);
-        /*if (newRequest.equals(creationRequest))
-            return true;
-        return false;*/
     }
 
     public void setCalling() {

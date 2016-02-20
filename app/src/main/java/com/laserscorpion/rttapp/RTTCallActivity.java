@@ -24,7 +24,6 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
         setContentView(R.layout.activity_rttcall);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
-        //getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         getSupportActionBar().setHomeButtonEnabled(false);
         TextView view = (TextView)findViewById(R.id.textview);
         view.setMovementMethod(new ScrollingMovementMethod());
@@ -56,7 +55,6 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
 
     private void addText(final String text) {
         final TextView view = (TextView)findViewById(R.id.textview);
-        //String currentText = view.getText().toString();
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
@@ -81,7 +79,6 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
     }
 
     public void hangUp(View view) {
-        Log.d(TAG, "choosing to hang up");
         texter.hangUp();
         finish();
     }
