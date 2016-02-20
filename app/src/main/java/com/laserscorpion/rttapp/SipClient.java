@@ -283,6 +283,12 @@ public class SipClient implements SipListener {
         }
     }
     private void notifySessionClosed() {
+        try {
+            /* this is a bad concurrency hack to make sure the SessionListener has
+            registered before it must be killed due to receiving an immediate BYE */
+            Thread.sleep(500, 0);
+        } catch (InterruptedException e) {}
+
         for (SessionListener listener : sessionReceivers) {
             listener.SessionClosed();
         }
