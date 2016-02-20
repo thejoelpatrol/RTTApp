@@ -461,7 +461,7 @@ public class SipClient implements SipListener {
             case Request.ACK:
                 Log.d(TAG, "Not really implemented yet");
                 if (currentCall != null && currentCall.isRinging())
-                    currentCall.callAccepted();
+                    currentCall.accept();
                 else
                     Log.e(TAG, "stray ACK, what do I do? In response to a 488?");
                 break;
@@ -565,7 +565,7 @@ public class SipClient implements SipListener {
             }
             SipResponder responder = new SipResponder(sipProvider, incomingEvent, currentCall.getInviteTransaction());
             responder.execute(response);
-            currentCall.accept();
+            //currentCall.accept();
         } catch (Exception e) {
             // again, this is a lot of exceptions to catch all at once. oh well...
             // TODO handle this
