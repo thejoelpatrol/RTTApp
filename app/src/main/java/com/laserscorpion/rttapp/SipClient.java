@@ -757,6 +757,7 @@ public class SipClient implements SipListener {
             sendBye(dialog);
             currentCall.end();
             currentCall = null;
+            notifySessionFailed("other party doesn't support RTT");
         }
         callLock.release();
     }
@@ -775,8 +776,11 @@ public class SipClient implements SipListener {
             Header header = list.next();
             if (header.getName().equals("application/sdp")) {
                 String content = (String)response.getContent();
-                if (content.contains("t140"))
+                if (content.toLowerCase().contains("t140")) {
+                    Log.d(TAG, "It's ACCEPTABLE!!!");
                     return true;
+                }
+
             }
         }
         return false;
