@@ -1,6 +1,8 @@
 package com.laserscorpion.rttapp;
 
 import android.content.Context;
+import android.gov.nist.javax.sip.SipStackImpl;
+import android.gov.nist.javax.sip.clientauthutils.AuthenticationHelper;
 import android.javax.sip.SipException;
 import android.javax.sip.address.*;
 import android.javax.sip.header.*;
@@ -25,6 +27,8 @@ import java.util.ListIterator;
 import java.util.Properties;
 import java.util.concurrent.Semaphore;
 
+import android.gov.nist.javax.sip.SipStackExt;
+import android.gov.nist.javax.sip.clientauthutils.*;
 
 /**
  * Some of this class based on http://alex.bikfalvi.com/teaching/upf/2013/architecture_and_signaling/lab/sip/
@@ -295,10 +299,10 @@ public class SipClient implements SipListener {
     }
 
     public void register() throws android.net.sip.SipException {
-        doRegister(DEFAULT_REGISTRATION_LEN);
+        doRegister(DEFAULT_REGISTRATION_LEN, null);
     }
 
-    private void doRegister(int registrationLength) throws android.net.sip.SipException {
+    private void doRegister(int registrationLength, Header extraHeader) throws android.net.sip.SipException {
         int tag = randomGen.nextInt();
         URI requestURI = globalSipAddress.getURI();
 
@@ -320,7 +324,8 @@ public class SipClient implements SipListener {
             ExpiresHeader expiresHeader = headerFactory.createExpiresHeader(registrationLength);
             request.addHeader(expiresHeader);
             request.addHeader(localContactHeader);
-
+            if (extraHeader != null)
+                request.addHeader(extraHeader);
             Log.d(TAG, "Sending stateful registration for " + globalSipAddress);
             SipRequester requester = new SipRequester(sipProvider);
             requester.execute(request);
@@ -348,7 +353,7 @@ public class SipClient implements SipListener {
     public void unregister() throws android.net.sip.SipException {
         try {
             Log.d(TAG, "re-registering for time 0");
-            doRegister(0);
+            doRegister(0, null);
         } catch (Exception e) {
             // TODO handle this
             e.printStackTrace();
@@ -697,7 +702,9 @@ public class SipClient implements SipListener {
                      callLock was locked when initiating the call */
     private void handleFailure(ResponseEvent responseEvent) {
         Response response = responseEvent.getResponse();
-        if (isInviteResponse(responseEvent)) {
+        if (response.getStatusCode() == Response.UNAUTHORIZED) {
+            handleChallenge(responseEvent);
+        } else if (isInviteResponse(responseEvent)) {
             switch (response.getStatusCode()) {
                 case Response.UNAUTHORIZED:
                     handleInviteAutentication(responseEvent);
@@ -753,11 +760,28 @@ public class SipClient implements SipListener {
         return isXResponse(responseEvent, Request.REGISTER);
     }
 
+    /* This usage inspired by https://stackoverflow.com/questions/21840496/asterisk-jain-sip-why-do-i-need-to-authenticate-several-times   */
+    private void handleChallenge(ResponseEvent responseEvent) {
+        ClientTransaction origTransaction = responseEvent.getClientTransaction();
+        AccountManagerImpl manager = new AccountManagerImpl();
+        SipStackExt stack = (SipStackExt)sipStack; // this cast is legal, but sketchy, we need v2.0 of NIST JAIN SIP
+        AuthenticationHelper authenticator = stack.getAuthenticationHelper(manager, headerFactory);
+        try {
+            ClientTransaction transaction = authenticator.handleChallenge(responseEvent.getResponse(), origTransaction, sipProvider, 10);
+            //Request authenticatedRequest = transaction.getRequest();
+            SipTransactionRequester requester = new SipTransactionRequester(sipProvider);
+            requester.execute(transaction);
+        } catch (SipException e) {
+            Log.e(TAG, "Unable to respond to challenge");
+            e.printStackTrace();
+        }
+    }
 
     private void handleInviteAutentication(ResponseEvent responseEvent) {
         Log.d(TAG, "must authenticate invite!");
         sendControlMessage("need to authenticate");
     }
+
     private void handleInviteProxyAutentication(ResponseEvent responseEvent) {
         Log.d(TAG, "must authenticate proxy invite!");
         sendControlMessage("need to proxy authenticate");
@@ -765,8 +789,14 @@ public class SipClient implements SipListener {
 
 
     private void handleRegisterAutentication(ResponseEvent responseEvent) {
-        Log.d(TAG, "must authenticate registration!");
-        sendControlMessage("need to authenticate");
+        //Log.d(TAG, "must authenticate registration!");
+       // sendControlMessage("need to authenticate");
+        Response response = responseEvent.getResponse();
+        ExpiresHeader expires = response.getExpires();
+        int registrationLen = expires.getExpires();
+        WWWAuthenticateHeader authenticateHeader = (WWWAuthenticateHeader)response.getHeader("WWW-Authenticate");
+
+
     }
     private void handleRegisterProxyAutentication(ResponseEvent responseEvent) {
         Log.d(TAG, "must authenticate proxy registration!");
@@ -904,5 +934,18 @@ public class SipClient implements SipListener {
             return null;
         }
     }
-
+    /* this helper class from https://stackoverflow.com/questions/21840496/asterisk-jain-sip-why-do-i-need-to-authenticate-several-times */
+    private class AccountManagerImpl implements AccountManager {
+        @Override
+        public UserCredentials getCredentials(ClientTransaction clientTransaction, String s) {
+            return new UserCredentials() {
+                @Override
+                public String getUserName() { return username; }
+                @Override
+                public String getPassword() { return password; }
+                @Override
+                public String getSipDomain() { return server; }
+            };
+        }
+    }
 }
