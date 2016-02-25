@@ -74,7 +74,7 @@ public class RTTRegistrationActivity extends AppCompatActivity implements TextLi
         */
         try {
             texter.unregister();
-            texter.close();
+            //texter.close();
         } catch (SipException e) {
             addText("Failed to unregister: " + e);
         }
