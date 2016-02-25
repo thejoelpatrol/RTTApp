@@ -706,12 +706,6 @@ public class SipClient implements SipListener {
             handleChallenge(responseEvent);
         } else if (isInviteResponse(responseEvent)) {
             switch (response.getStatusCode()) {
-                case Response.UNAUTHORIZED:
-                    handleInviteAutentication(responseEvent);
-                    break;
-                case Response.PROXY_AUTHENTICATION_REQUIRED:
-                    handleInviteProxyAutentication(responseEvent);
-                    break;
                 case Response.BUSY_HERE:
                     notifySessionFailed("busy");
                     break;
@@ -728,12 +722,6 @@ public class SipClient implements SipListener {
             /* I don't think I need to send ACK for the non-2xx response */
         } else if (isRegisterResponse(responseEvent)) {
             switch (response.getStatusCode()) {
-                case Response.UNAUTHORIZED:
-                    handleRegisterAutentication(responseEvent);
-                    break;
-                case Response.PROXY_AUTHENTICATION_REQUIRED:
-                    handleRegisterProxyAutentication(responseEvent);
-                    break;
                 default:
                     Log.d(TAG, "registration failure not implemented");
                     break;
@@ -776,33 +764,6 @@ public class SipClient implements SipListener {
             e.printStackTrace();
         }
     }
-
-    private void handleInviteAutentication(ResponseEvent responseEvent) {
-        Log.d(TAG, "must authenticate invite!");
-        sendControlMessage("need to authenticate");
-    }
-
-    private void handleInviteProxyAutentication(ResponseEvent responseEvent) {
-        Log.d(TAG, "must authenticate proxy invite!");
-        sendControlMessage("need to proxy authenticate");
-    }
-
-
-    private void handleRegisterAutentication(ResponseEvent responseEvent) {
-        //Log.d(TAG, "must authenticate registration!");
-       // sendControlMessage("need to authenticate");
-        Response response = responseEvent.getResponse();
-        ExpiresHeader expires = response.getExpires();
-        int registrationLen = expires.getExpires();
-        WWWAuthenticateHeader authenticateHeader = (WWWAuthenticateHeader)response.getHeader("WWW-Authenticate");
-
-
-    }
-    private void handleRegisterProxyAutentication(ResponseEvent responseEvent) {
-        Log.d(TAG, "must authenticate proxy registration!");
-        sendControlMessage("need to proxy authenticate");
-    }
-
 
     private void handleSuccess(ResponseEvent responseEvent) {
         Response response = responseEvent.getResponse();
