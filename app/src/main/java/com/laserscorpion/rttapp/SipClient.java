@@ -699,6 +699,12 @@ public class SipClient implements SipListener {
         Response response = responseEvent.getResponse();
         if (isInviteResponse(responseEvent)) {
             switch (response.getStatusCode()) {
+                case Response.UNAUTHORIZED:
+                    handleInviteAutentication(responseEvent);
+                    break;
+                case Response.PROXY_AUTHENTICATION_REQUIRED:
+                    handleInviteProxyAutentication(responseEvent);
+                    break;
                 case Response.BUSY_HERE:
                     notifySessionFailed("busy");
                     break;
@@ -712,30 +718,71 @@ public class SipClient implements SipListener {
                     notifySessionFailed("call failed");
                     break;
             }
-            callLock.release();
-            /* I don't think I need to send ACK for the non-2xx response
-               I think the Dialog layer does this for me?
-             */
-            hangUp();
+            /* I don't think I need to send ACK for the non-2xx response */
+        } else if (isRegisterResponse(responseEvent)) {
+            switch (response.getStatusCode()) {
+                case Response.UNAUTHORIZED:
+                    handleRegisterAutentication(responseEvent);
+                    break;
+                case Response.PROXY_AUTHENTICATION_REQUIRED:
+                    handleRegisterProxyAutentication(responseEvent);
+                    break;
+                default:
+                    Log.d(TAG, "registration failure not implemented");
+                    break;
+
+            }
         }
+        callLock.release();
+        hangUp();
     }
 
-    private boolean isInviteResponse(ResponseEvent responseEvent) {
+    private boolean isXResponse(ResponseEvent responseEvent, String method) {
         Response response = responseEvent.getResponse();
         String inResponseTo = response.getHeader("CSeq").toString();
-        if (inResponseTo.contains("INVITE"))
+        if (inResponseTo.contains(method))
             return true;
         return false;
     }
+
+    private boolean isInviteResponse(ResponseEvent responseEvent) {
+        return isXResponse(responseEvent, Request.INVITE);
+    }
+
+    private boolean isRegisterResponse(ResponseEvent responseEvent) {
+        return isXResponse(responseEvent, Request.REGISTER);
+    }
+
+
+    private void handleInviteAutentication(ResponseEvent responseEvent) {
+        Log.d(TAG, "must authenticate invite!");
+        sendControlMessage("need to authenticate");
+    }
+    private void handleInviteProxyAutentication(ResponseEvent responseEvent) {
+        Log.d(TAG, "must authenticate proxy invite!");
+        sendControlMessage("need to proxy authenticate");
+    }
+
+
+    private void handleRegisterAutentication(ResponseEvent responseEvent) {
+        Log.d(TAG, "must authenticate registration!");
+        sendControlMessage("need to authenticate");
+    }
+    private void handleRegisterProxyAutentication(ResponseEvent responseEvent) {
+        Log.d(TAG, "must authenticate proxy registration!");
+        sendControlMessage("need to proxy authenticate");
+    }
+
 
     private void handleSuccess(ResponseEvent responseEvent) {
         Response response = responseEvent.getResponse();
         Dialog dialog = responseEvent.getDialog();
         if (isInviteResponse(responseEvent))
             handleInviteSuccess(responseEvent);
+        else if (isRegisterResponse(responseEvent))
+            sendControlMessage("Registered");
         else
             Log.d(TAG, "need to implement handling other successes");
-
     }
 
     /*
