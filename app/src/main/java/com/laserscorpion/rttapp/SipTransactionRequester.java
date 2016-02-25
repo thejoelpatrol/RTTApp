@@ -24,7 +24,7 @@ public class SipTransactionRequester extends AsyncTask<ClientTransaction, String
             ClientTransaction transaction = transactions[0];
             transaction.sendRequest();
             return "Success";
-        } catch (SipException e) {
+        } catch (Exception e) {
             Log.e(TAG, "the request still failed. UGH");
             e.printStackTrace();
             return null;

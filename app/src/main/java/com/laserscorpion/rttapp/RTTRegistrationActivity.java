@@ -118,10 +118,14 @@ public class RTTRegistrationActivity extends AppCompatActivity implements TextLi
         this.registerReceiver(callReceiver, filter);
     }*/
 
-    private void addText(String text) {
-        TextView view = (TextView)findViewById(R.id.textview);
-        String currentText = view.getText().toString();
-        view.setText(currentText + text);
+    private void addText(final String text) {
+        final TextView view = (TextView)findViewById(R.id.textview);
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                view.append(text);
+            }
+        });
     }
 
     public void call(View view) {

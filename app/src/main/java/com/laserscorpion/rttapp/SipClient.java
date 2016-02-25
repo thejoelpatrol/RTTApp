@@ -762,16 +762,16 @@ public class SipClient implements SipListener {
 
     /* This usage inspired by https://stackoverflow.com/questions/21840496/asterisk-jain-sip-why-do-i-need-to-authenticate-several-times   */
     private void handleChallenge(ResponseEvent responseEvent) {
+        Log.d(TAG, "!!!! 44444 handling challenge!");
         ClientTransaction origTransaction = responseEvent.getClientTransaction();
         AccountManagerImpl manager = new AccountManagerImpl();
         SipStackExt stack = (SipStackExt)sipStack; // this cast is legal, but sketchy, we need v2.0 of NIST JAIN SIP
         AuthenticationHelper authenticator = stack.getAuthenticationHelper(manager, headerFactory);
         try {
             ClientTransaction transaction = authenticator.handleChallenge(responseEvent.getResponse(), origTransaction, sipProvider, 10);
-            //Request authenticatedRequest = transaction.getRequest();
             SipTransactionRequester requester = new SipTransactionRequester(sipProvider);
             requester.execute(transaction);
-        } catch (SipException e) {
+        } catch (Exception e) {
             Log.e(TAG, "Unable to respond to challenge");
             e.printStackTrace();
         }
