@@ -69,14 +69,15 @@ public class RTTRegistrationActivity extends AppCompatActivity implements TextLi
         /* not sure how i want to handle onDestroy - it seems we should
            unregister and close the socket when dying, but onDestroy is
            also called when rotating the screen
+
+           For now, screen rotation is disabled in this activity
         */
-        /*try {
+        try {
             texter.unregister();
             texter.close();
         } catch (SipException e) {
             addText("Failed to unregister: " + e);
-        }*/
-        //this.unregisterReceiver(callReceiver);
+        }
     }
 
     private String getRegistrar() {
