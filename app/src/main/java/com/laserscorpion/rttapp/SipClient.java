@@ -722,6 +722,7 @@ public class SipClient implements SipListener {
                     notifySessionFailed("call failed");
                     break;
             }
+            hangUp();
         } else if (isRegisterResponse(responseEvent)) {
             switch (response.getStatusCode()) {
                 default:
@@ -730,7 +731,6 @@ public class SipClient implements SipListener {
 
             }
         }
-        hangUp();
     }
 
     private boolean isXResponse(ResponseEvent responseEvent, String method) {
