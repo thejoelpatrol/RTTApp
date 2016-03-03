@@ -17,6 +17,7 @@ import android.javax.sip.*;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.text.ParseException;
 import java.util.ArrayList;
@@ -813,13 +814,13 @@ public class SipClient implements SipListener {
         ListIterator<Header> list = response.getHeaders("Content-Type");
         while (list.hasNext()) {
             Header header = list.next();
-            if (header.getName().equals("application/sdp")) {
-                String content = (String)response.getContent();
-                if (content.toLowerCase().contains("t140")) {
+            if (header.toString().contains("application/sdp")) {
+                 byte content[] = response.getRawContent();
+                String strContent = new String(content, StandardCharsets.UTF_8);
+                if (strContent.toLowerCase().contains("t140/1000")) {
                     Log.d(TAG, "It's ACCEPTABLE!!!");
                     return true;
                 }
-
             }
         }
         return false;
