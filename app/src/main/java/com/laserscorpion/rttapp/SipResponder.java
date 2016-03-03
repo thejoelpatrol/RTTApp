@@ -31,6 +31,8 @@ public class SipResponder extends AsyncTask<Response, String, ServerTransaction>
      */
     @Override
     protected ServerTransaction doInBackground(Response... responses) {
+        Thread.currentThread().setPriority(Thread.MAX_PRIORITY);
+
         Request request = requestEvent.getRequest();
         Response response = responses[0];
 

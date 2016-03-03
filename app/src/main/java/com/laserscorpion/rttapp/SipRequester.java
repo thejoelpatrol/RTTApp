@@ -20,6 +20,7 @@ public class SipRequester extends AsyncTask<Request, String, String> {
 
     @Override
     protected String doInBackground(Request... requests) {
+        Thread.currentThread().setPriority(Thread.MAX_PRIORITY);
         try {
             ClientTransaction transaction = sipProvider.getNewClientTransaction(requests[0]);
             transaction.sendRequest();

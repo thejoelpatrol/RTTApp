@@ -702,7 +702,7 @@ public class SipClient implements SipListener {
                      callLock was locked when initiating the call */
     private void handleFailure(ResponseEvent responseEvent) {
         Response response = responseEvent.getResponse();
-        if (response.getStatusCode() == Response.UNAUTHORIZED) {
+        if (response.getStatusCode() == Response.UNAUTHORIZED || response.getStatusCode() == Response.PROXY_AUTHENTICATION_REQUIRED) {
             handleChallenge(responseEvent);
         } else if (isInviteResponse(responseEvent)) {
             switch (response.getStatusCode()) {
@@ -712,6 +712,9 @@ public class SipClient implements SipListener {
                 case Response.DECLINE:
                     notifySessionFailed("call declined");
                     break;
+                case Response.NOT_FOUND:
+                    notifySessionFailed("user not found");
+                    break;
                 case Response.NOT_ACCEPTABLE:
                     notifySessionFailed("callee doesn't support RTT");
                     break;
@@ -719,7 +722,6 @@ public class SipClient implements SipListener {
                     notifySessionFailed("call failed");
                     break;
             }
-            /* I don't think I need to send ACK for the non-2xx response */
         } else if (isRegisterResponse(responseEvent)) {
             switch (response.getStatusCode()) {
                 default:
@@ -728,7 +730,6 @@ public class SipClient implements SipListener {
 
             }
         }
-        callLock.release();
         hangUp();
     }
 
