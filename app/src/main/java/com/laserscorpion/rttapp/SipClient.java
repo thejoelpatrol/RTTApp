@@ -1,8 +1,19 @@
 package com.laserscorpion.rttapp;
 
 import android.content.Context;
+import android.gov.nist.javax.sdp.fields.AttributeField;
 import android.gov.nist.javax.sip.SipStackImpl;
 import android.gov.nist.javax.sip.clientauthutils.AuthenticationHelper;
+import android.gov.nist.javax.sip.header.ContentEncoding;
+import android.javax.sdp.Attribute;
+import android.javax.sdp.Connection;
+import android.javax.sdp.Media;
+import android.javax.sdp.MediaDescription;
+import android.javax.sdp.Origin;
+import android.javax.sdp.SdpException;
+import android.javax.sdp.SdpFactory;
+import android.javax.sdp.SdpParseException;
+import android.javax.sdp.SessionDescription;
 import android.javax.sip.SipException;
 import android.javax.sip.address.*;
 import android.javax.sip.header.*;
@@ -10,6 +21,8 @@ import android.javax.sip.message.*;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.AsyncTask;
+import android.os.StrictMode;
+import android.provider.MediaStore;
 import android.text.TextUtils;
 import android.util.Log;
 import android.javax.sip.*;
@@ -26,6 +39,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Properties;
+import java.util.Vector;
 import java.util.concurrent.Semaphore;
 
 import android.gov.nist.javax.sip.SipStackExt;
@@ -40,13 +54,14 @@ public class SipClient implements SipListener {
     private static final int MAX_FWDS = 70;
     private static final int DEFAULT_REGISTRATION_LEN = 600;
     private static final int CALL_RINGING_TIME = 30;
-    private static final String ALLOWED_METHODS[] = {Request.ACK, Request.BYE, Request.INVITE, Request.OPTIONS};
+    private static final String ALLOWED_METHODS[] = {Request.ACK, Request.BYE, Request.INVITE, Request.OPTIONS, Request.CANCEL};
     private android.content.Context parent;
     private SipFactory sipFactory;
     private SipStack sipStack;
     private SipProvider sipProvider;
     private MessageFactory messageFactory;
     private HeaderFactory headerFactory;
+    private SdpFactory SDPFactory;
     private AddressFactory addressFactory;
     private ListeningPoint listeningPoint;
     private Properties properties;
@@ -131,11 +146,14 @@ public class SipClient implements SipListener {
         properties.setProperty("android.javax.sip.STACK_NAME", "stack");
         properties.setProperty("android.javax.sip.IP_ADDRESS", localIP);
         properties.setProperty("android.javax.sip.TRACE_LEVEL", "32");
+        //properties.setProperty("android.javax.sip.REENTRANT_LISTENER", "true");
+        //properties.setProperty("android.gov.nist.javax.sip.REENTRANT_LISTENER", "true");
         try {
             sipStack = sipFactory.createSipStack(properties);
             messageFactory = sipFactory.createMessageFactory();
             headerFactory = sipFactory.createHeaderFactory();
             addressFactory = sipFactory.createAddressFactory();
+            SDPFactory = SdpFactory.getInstance();
             listeningPoint = sipStack.createListeningPoint(localIP, port, protocol); // a ListeningPoint is a socket wrapper
             // TODO allow different ports if this one is not available
             sipProvider = sipStack.createSipProvider(listeningPoint);
@@ -379,6 +397,7 @@ public class SipClient implements SipListener {
             throw new TransactionUnavailableException("Can't call now -- already modifying call state");
         if (currentCall != null) {
             callLock.release();
+            Log.d(TAG, "555555555 should be 1:" + callLock.availablePermits());
             throw new TransactionUnavailableException("Can't call now -- already on a call");
         }
         Address contact = addressFactory.createAddress("sip:" + URI);
@@ -395,7 +414,7 @@ public class SipClient implements SipListener {
             request.addHeader(localContactHeader);
             ExpiresHeader expiresHeader = headerFactory.createExpiresHeader(CALL_RINGING_TIME);
             request.addHeader(expiresHeader);
-            addSDPContentAndHeader(request);
+            addSDPContentAndHeader(request, 0);
             SipRequester requester = new SipRequester(sipProvider);
             requester.execute(request);
             currentCall = new RTTCall(request, null);
@@ -407,10 +426,13 @@ public class SipClient implements SipListener {
                 sendControlMessage("Sent INVITE request");
             } else {
                 callLock.release();
+                Log.d(TAG, "6666666666 should be 1:" + callLock.availablePermits());
                 throw new SipException("async thread failed to send request");
             }
         } catch (Exception e) {
             callLock.release();
+            Log.d(TAG, "777777777777 should be 1:" + callLock.availablePermits());
+            e.printStackTrace();
             throw new SipException("couldn't send request; " + e.getMessage());
         }
     }
@@ -419,33 +441,57 @@ public class SipClient implements SipListener {
         return currentCall != null;
     }
 
-    private void addSDPContentAndHeader(Request request) {
-        String sdp = createInviteSDPContent();
-        ContentTypeHeader typeHeader = null;
+    private void addSDPContentAndHeader(Message message, int preferredMap) {
+        String sdp = createSDPContent(preferredMap);
+        ContentTypeHeader typeHeader;
         try {
             typeHeader = headerFactory.createContentTypeHeader("application", "sdp");
-            request.setContent(sdp, typeHeader);
+            message.setContent(sdp, typeHeader);
         } catch (Exception e) {
             // TODO do i need to handle this?
             e.printStackTrace();
         }
+
     }
 
-    private void addSDPContentAndHeader(Response response) {
-        String sdp = createInviteSDPContent();
-        ContentTypeHeader typeHeader = null;
+    private String createSDPContent(int mapNum) {
+        final int SAMPLE_RATE = 1000; // defined by RFC 4103 p.15
+        int sessionID = Math.abs(randomGen.nextInt());
+        if (mapNum == 0)
+            mapNum = 100;
         try {
-            typeHeader = headerFactory.createContentTypeHeader("application", "sdp");
-            response.setContent(sdp, typeHeader);
-        } catch (Exception e) {
-            // TODO do i need to handle this?
-            e.printStackTrace();
-        }
-    }
+            int codecs[] = {mapNum};
+            MediaDescription textMedia = SDPFactory.createMediaDescription("text", port+1, 1, "RTP/AVP", codecs);
+            textMedia.setAttribute("rtpmap", mapNum + " t140/" + SAMPLE_RATE);
+            AttributeField sendrecv = new AttributeField();
+            sendrecv.setName("sendrecv");
+            sendrecv.setValueAllowNull(null);
+            textMedia.addAttribute(sendrecv);
 
-    private String createInviteSDPContent() {
-        //TODO implement this
-        return " ";
+            /* creating the session description requires checking the IP address (poorly)
+               this is a "network" operation so isn't normally allowed by Android on the main thread
+               what's annoying is that we have to replace the garbage that createSessionDescription()
+               puts in session anyway */
+            StrictMode.ThreadPolicy tp0 = StrictMode.getThreadPolicy();
+            StrictMode.ThreadPolicy tp1 = StrictMode.ThreadPolicy.LAX;
+            StrictMode.setThreadPolicy(tp1);
+            SessionDescription session = SDPFactory.createSessionDescription();
+            Origin origin = SDPFactory.createOrigin(username, sessionID, 1, "IN", "IP4", localIP);
+            session.setOrigin(origin);
+            StrictMode.setThreadPolicy(tp0);
+
+            Connection connection = SDPFactory.createConnection(localIP);
+            session.setConnection(connection);
+            Vector mediaDescs = session.getMediaDescriptions(true);
+            mediaDescs.add(textMedia);
+            session.setMediaDescriptions(mediaDescs);
+            session.setSessionName(SDPFactory.createSessionName("RTT_SDP_v0.1"));
+            return session.toString();
+        } catch (SdpException e) {
+            Log.e(TAG, "could not create SDP");
+            e.printStackTrace();
+            return null;
+        }
     }
 
     @Override
@@ -518,6 +564,7 @@ public class SipClient implements SipListener {
             if (currentCall.isCalling()) {
                 sendCancel();
                 callLock.release();
+                Log.d(TAG, "88888888888 should be 1:" + callLock.availablePermits());
             }
             else if (currentCall.isConnected())
                 sendBye(currentCall.getDialog());
@@ -547,7 +594,8 @@ public class SipClient implements SipListener {
         Request request = currentCall.getCreationRequest();
         try {
             Response response = messageFactory.createResponse(Response.OK, request);
-            addSDPContentAndHeader(response);
+            int suggestedT140Map = getT140MapNum(request);
+            addSDPContentAndHeader(response, suggestedT140Map);
             response.addHeader(localContactHeader);
             if (request.getHeader("Accept") != null) {
                 // TODO send the message body that this request is demanding
@@ -561,6 +609,37 @@ public class SipClient implements SipListener {
             currentCall.end();
         }
         callLock.release();
+        Log.d(TAG, "9999999999 should be 1:" + callLock.availablePermits());
+    }
+
+    /* I'll be mad if it turns out there is a way to do this automatically with the
+    SDP library, but as far as I can tell, all it does is structure the string into
+    discrete lines of different types
+     */
+    private int getT140MapNum(Request otherPartyRequest) {
+        String body = new String(otherPartyRequest.getRawContent(), StandardCharsets.UTF_8);
+        try {
+            SessionDescription suggestedSession = SDPFactory.createSessionDescription(body);
+            Vector<MediaDescription> mediaDescriptions = suggestedSession.getMediaDescriptions(true);
+            for (MediaDescription mediaDescription : mediaDescriptions) {
+                Media media = mediaDescription.getMedia();
+                if (media.getMediaType().equals("text")) {
+                    Vector<Attribute> attributes = mediaDescription.getAttributes(true);
+                    for (Attribute attr : attributes) {
+                        String attrValue = attr.getValue().toLowerCase();
+                        String attrName = attr.getName();
+                        if (attrName.equals("rtpmap") && attrValue.contains("t140") && !attrValue.contains("red")) {
+                            String mapNum = attrValue.split(" ")[0];
+                            return Integer.decode(mapNum);
+                        }
+                    }
+                }
+            }
+            return 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return 0;
+        }
     }
 
     /*  Precondition: callLock is locked, and currentCall has a copy of the incoming request event.
@@ -582,11 +661,13 @@ public class SipClient implements SipListener {
         currentCall.end();
         currentCall = null;
         callLock.release();
+        Log.d(TAG, "154254124512 should be 1:" + callLock.availablePermits());
     }
 
     private void receiveCall(RequestEvent requestEvent) {
         boolean lockAvailable = callLock.tryAcquire();
         if (lockAvailable && !onACallNow()) {
+            Log.d(TAG, "just acquired the lock - permits remaining: " + callLock.availablePermits());
             Log.d(TAG, "we're available...");
             if (callReceiver != null) {
                 Log.d(TAG, "asking receiver to accept...");
@@ -598,10 +679,13 @@ public class SipClient implements SipListener {
                 // TODO respond 4xx
                 Log.e(TAG, "uh oh, we're releasing this lock...why?");
                 callLock.release();
+                Log.d(TAG, "9807896778956789 should be 1:" + callLock.availablePermits());
             }
         } else {
-            if (lockAvailable)
+            if (lockAvailable) {
                 callLock.release(); // we just acquired this, but can't use it after all
+                Log.d(TAG, "545456767887 should be 1:" + callLock.availablePermits());
+            }
             RTTCall latestCall = new RTTCall(requestEvent, null);
             if (currentCall.equals(latestCall)) {
                 // asterisk sends many duplicate invites
@@ -618,6 +702,7 @@ public class SipClient implements SipListener {
             respondGeneric(initialINVITE, initialINVITE.getServerTransaction(), Response.REQUEST_TERMINATED);
             notifySessionFailed("Caller cancelled call");
             callLock.release();
+            Log.d(TAG, "1111111111 should be 1:" + callLock.availablePermits());
             terminateCall();
         }
     }
@@ -678,6 +763,7 @@ public class SipClient implements SipListener {
             currentCall = null;
         }
         callLock.release();
+        Log.d(TAG, "2222222222 should be 1:" + callLock.availablePermits());
     }
 
     @Override
@@ -800,6 +886,7 @@ public class SipClient implements SipListener {
             notifySessionFailed("other party doesn't support RTT");
         }
         callLock.release();
+        Log.d(TAG, "44444444444 should be 1:" + callLock.availablePermits());
     }
 
     private void ACKResponse(Response response, Dialog dialog) {
@@ -810,7 +897,9 @@ public class SipClient implements SipListener {
     }
 
     private boolean sessionIsAcceptable(Response response) {
-        // TODO implement this
+        /* this is slightly imprecise because we are not looking specifically
+        at the ContentTypeHeader and are not looking specifically inside the media
+        descriptions and attributes in the SDP ... but it works */
         ListIterator<Header> list = response.getHeaders("Content-Type");
         while (list.hasNext()) {
             Header header = list.next();
