@@ -24,6 +24,9 @@ public class RTTCall {
     private boolean connected;
     private boolean calling;
 
+    private int localPort;
+    private int remotePort;
+    private String remoteIP;
     /**
      * Use this constructor for an incoming call - the requestEvent is the INVITE,
      * the transaction is the ServerTransaction used to respond to the INVITE,
@@ -98,24 +101,49 @@ public class RTTCall {
         ringing = true;
     }
 
-    public void accept() throws IllegalStateException {
+    /**
+     *
+     * @param remoteIP the IP of the remote party for the RTP stream
+     * @param remotePort the port of the remote party for the RTP stream
+     * @param localRTPPort the local port to be used for the RTP stream
+     * @throws IllegalStateException if no call is currently ringing
+     */
+    public void accept(String remoteIP, int remotePort, int localRTPPort) throws IllegalStateException {
         if (!ringing)
             throw new IllegalStateException("call is not ringing - cannot accept");
-        connected = true;
+        connectCall(remoteIP, remotePort, localRTPPort);
+        /*connected = true;
         ringing = false;
-        setUpStream();
+        setUpStream();*/
     }
-    public void callAccepted() {
+    /**
+     *
+     * @param remoteIP the IP of the remote party for the RTP stream
+     * @param remotePort the port of the remote party for the RTP stream
+     * @param localRTPPort the local port to be used for the RTP stream
+     * @throws IllegalStateException if no call is currently outgoing
+     */
+    public void callAccepted(String remoteIP, int remotePort, int localRTPPort) {
         if (!calling)
             throw new IllegalStateException("not calling anyone - what was accepted?");
-        connected = true;
+        connectCall(remoteIP, remotePort, localRTPPort);
+     /*connected = true;
         calling = false;
-        setUpStream();
+        setUpStream();*/
+    }
+
+    private void connectCall(String remoteIP, int remotePort, int localRTPPort) {
+        this.remoteIP = remoteIP;
+        this.remotePort = remotePort;
+        this.localPort = localRTPPort;
+        connected = true;
+        ringing = false;
+        calling = false;
     }
 
     /**
-     * End a call at any stage. Calling multiple times has no effect; the
-     * first call ends the session.
+     * End a call at any stage. Invoking multiple times has no effect; the
+     * first invocation ends the session.
      */
     public void end() {
         if (destructionLock.tryAcquire()) {

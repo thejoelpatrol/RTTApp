@@ -3,6 +3,7 @@ package com.laserscorpion.rttapp;
 import android.content.Context;
 import android.gov.nist.javax.sdp.fields.AttributeField;
 import android.gov.nist.javax.sip.SipStackImpl;
+import android.gov.nist.javax.sip.address.AddressImpl;
 import android.gov.nist.javax.sip.clientauthutils.AuthenticationHelper;
 import android.gov.nist.javax.sip.header.ContentEncoding;
 import android.javax.sdp.Attribute;
@@ -508,8 +509,10 @@ public class SipClient implements SipListener {
                 break;
             case Request.ACK:
                 //Log.d(TAG, "Not really implemented yet");
-                if (currentCall != null && currentCall.isRinging())
-                    currentCall.accept();
+                if (currentCall != null && currentCall.isRinging()) {
+                    Request originalInvite = currentCall.getCreationEvent().getRequest();
+                    currentCall.accept(getContactIP(originalInvite), getT140PortNum(originalInvite), port+1);
+                }
                 else
                     Log.e(TAG, "stray ACK, what do I do? In response to a 488?");
                 break;
@@ -641,6 +644,57 @@ public class SipClient implements SipListener {
             return 0;
         }
     }
+
+    private int getT140PortNum(Message otherPartySDP) {
+        String body = new String(otherPartySDP.getRawContent(), StandardCharsets.UTF_8);
+        try {
+            SessionDescription suggestedSession = SDPFactory.createSessionDescription(body);
+            Vector<MediaDescription> mediaDescriptions = suggestedSession.getMediaDescriptions(true);
+            for (MediaDescription mediaDescription : mediaDescriptions) {
+                Media media = mediaDescription.getMedia();
+                if (media.getMediaType().equals("text")) {
+                    // should also check attributes for t140 here
+                    return media.getMediaPort();
+                }
+            }
+            return 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return 0;
+        }
+    }
+
+    private String getContactIP(Message msg) {
+        ContactHeader contact = (ContactHeader)msg.getHeader("Contact");
+        AddressImpl address = (AddressImpl)contact.getAddress(); // this cast is correct for NIST implementation
+        return address.getHost();
+    }
+
+    /*private int getT140MapNum(MediaDescription mediaDescription) {
+        Media media = mediaDescription.getMedia();
+        try {
+            if (media.getMediaType().equals("text")) {
+                Vector<Attribute> attributes = mediaDescription.getAttributes(true);
+                for (Attribute attr : attributes) {
+                    String attrValue = attr.getValue().toLowerCase();
+                    String attrName = attr.getName();
+                    if (attrName.equals("rtpmap") && attrValue.contains("t140") && !attrValue.contains("red")) {
+                        String mapNum = attrValue.split(" ")[0];
+                        return Integer.decode(mapNum);
+                    }
+                }
+            }
+            return 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return 0;
+        }
+    }*/
+
+    /*private int getT140PortNum(MediaDescription mediaDescription) {
+        Media media = mediaDescription.getMedia();
+
+    }*/
 
     /*  Precondition: callLock is locked, and currentCall has a copy of the incoming request event.
         If a call is truly coming in, these will be satisfied.
@@ -877,7 +931,7 @@ public class SipClient implements SipListener {
         currentCall.addDialog(dialog);
         if (sessionIsAcceptable(response)) {
             Log.d(TAG, "acceptable!");
-            currentCall.callAccepted();
+            currentCall.callAccepted(getContactIP(response), getT140PortNum(response), port+1);
         } else {
             Log.d(TAG, "not acceptable");
             sendBye(dialog);
