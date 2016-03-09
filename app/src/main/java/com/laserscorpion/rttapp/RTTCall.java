@@ -7,6 +7,8 @@ import android.javax.sip.message.Request;
 
 import java.util.concurrent.Semaphore;
 
+import se.omnitor.RtpChat;
+
 /**
  * Created by joel on 2/12/16.
  */
@@ -18,15 +20,19 @@ public class RTTCall {
     private RequestEvent incomingRequest;
     private ServerTransaction inviteTransaction;
 
+
     private Semaphore creationLock;
     private Semaphore destructionLock;
     private boolean ringing;
     private boolean connected;
     private boolean calling;
 
+
     private int localPort;
     private int remotePort;
     private String remoteIP;
+    private RtpChat rtpChat;
+
     /**
      * Use this constructor for an incoming call - the requestEvent is the INVITE,
      * the transaction is the ServerTransaction used to respond to the INVITE,
@@ -73,6 +79,7 @@ public class RTTCall {
     public void addDialog(Dialog dialog) {
         this.dialog = dialog;
     }
+
 
     /**
      * Precondition: call was created by an incoming RequestEvent. If call
@@ -139,6 +146,8 @@ public class RTTCall {
         connected = true;
         ringing = false;
         calling = false;
+        rtpChat = new RtpChat(remoteIP, localRTPPort, remotePort, false);
+        rtpChat.start();
     }
 
     /**
@@ -166,8 +175,5 @@ public class RTTCall {
     }
     public boolean isCalling() {
         return calling;
-    }
-    private void setUpStream() {
-        //TODO implement this
     }
 }

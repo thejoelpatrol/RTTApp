@@ -15,3 +15,10 @@
 #-keepclassmembers class fqcn.of.javascript.interface.for.webview {
 #   public *;
 #}
+
+-keepclassmembers class java.media.protocol.ContentDescriptor {
+static final long serialVersionUID;
+java.lang.Object writeReplace();
+java.lang.Object readResolve();
+private static final java.io.ObjectStreamField[] serialPersistentFields;
+}

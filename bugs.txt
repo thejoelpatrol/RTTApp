@@ -8,4 +8,4 @@ bugs
 -preferences activity display is messed up
 -need to display "from" on incoming call activity
 -probably don't need to wait on get() any more
--ending a call on the callee side crashes with a null ptr exception in the asynctask
+-ending a call on the callee side crashes with a null ptr exception in the asynctask 
