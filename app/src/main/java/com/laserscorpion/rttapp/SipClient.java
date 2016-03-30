@@ -245,6 +245,10 @@ public class SipClient implements SipListener {
         return true;
     }
 
+    public String getLocalIP() {
+        return localIP;
+    }
+
     /**
      * This method should be called when a user of SipClient needs to register a new
      * receiver for the SipClient's text output. e.g. when the SipClient is handed from
@@ -418,7 +422,7 @@ public class SipClient implements SipListener {
             addSDPContentAndHeader(request, 0);
             SipRequester requester = new SipRequester(sipProvider);
             requester.execute(request);
-            currentCall = new RTTCall(request, null);
+            currentCall = new RTTCall(request, null, messageReceivers);
             currentCall.setCalling();
             if (requester.get().equals("Success")) {
                 // get() waits on the other thread
@@ -726,7 +730,7 @@ public class SipClient implements SipListener {
             if (callReceiver != null) {
                 Log.d(TAG, "asking receiver to accept...");
                 ServerTransaction transaction = respondGeneric(requestEvent, null, Response.RINGING);
-                currentCall = new RTTCall(requestEvent, transaction);
+                currentCall = new RTTCall(requestEvent, transaction, messageReceivers);
                 currentCall.setRinging();
                 callReceiver.callReceived();
             } else {
@@ -740,7 +744,7 @@ public class SipClient implements SipListener {
                 callLock.release(); // we just acquired this, but can't use it after all
                 Log.d(TAG, "545456767887 should be 1:" + callLock.availablePermits());
             }
-            RTTCall latestCall = new RTTCall(requestEvent, null);
+            RTTCall latestCall = new RTTCall(requestEvent, null, messageReceivers);
             if (currentCall.equals(latestCall)) {
                 // asterisk sends many duplicate invites
                 Log.d(TAG, "ignoring a duplicate INVITE");

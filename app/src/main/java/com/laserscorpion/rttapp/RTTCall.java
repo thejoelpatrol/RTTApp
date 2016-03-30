@@ -4,14 +4,29 @@ import android.javax.sip.Dialog;
 import android.javax.sip.RequestEvent;
 import android.javax.sip.ServerTransaction;
 import android.javax.sip.message.Request;
+import android.util.Log;
 
+import java.io.IOException;
+import java.net.UnknownHostException;
+import java.util.List;
 import java.util.concurrent.Semaphore;
+
+import gov.nist.jrtp.RtpErrorEvent;
+import gov.nist.jrtp.RtpException;
+import gov.nist.jrtp.RtpListener;
+import gov.nist.jrtp.RtpManager;
+import gov.nist.jrtp.RtpPacket;
+import gov.nist.jrtp.RtpPacketEvent;
+import gov.nist.jrtp.RtpSession;
+import gov.nist.jrtp.RtpStatusEvent;
+import gov.nist.jrtp.RtpTimeoutEvent;
 
 
 /**
  * Created by joel on 2/12/16.
  */
-public class RTTCall {
+public class RTTCall implements RtpListener {
+    private static final String TAG = "RTTCall";
     private SipClient sipClient;
     private Dialog dialog;
     private Request creationRequest;
@@ -31,6 +46,9 @@ public class RTTCall {
     private int remotePort;
     private String remoteIP;
 
+    private RtpManager manager;
+    private List<TextListener> messageReceivers;
+    private RtpSession session;
     /**
      * Use this constructor for an incoming call - the requestEvent is the INVITE,
      * the transaction is the ServerTransaction used to respond to the INVITE,
@@ -41,8 +59,8 @@ public class RTTCall {
      *                    sent yet and therefore no transaction is used yet. In that case, only
      *                    one response can be sent,
      */
-    public RTTCall(RequestEvent requestEvent, ServerTransaction transaction) {
-        this(requestEvent.getRequest(), requestEvent.getDialog());
+    public RTTCall(RequestEvent requestEvent, ServerTransaction transaction, List<TextListener> messageReceivers) {
+        this(requestEvent.getRequest(), requestEvent.getDialog(), messageReceivers);
         incomingRequest = requestEvent;
         inviteTransaction = transaction;
     }
@@ -54,11 +72,17 @@ public class RTTCall {
      * @param creationRequest the INVITE Request sent to the other party to initiate the call
      * @param dialog
      */
-    public RTTCall(Request creationRequest, Dialog dialog) {
+    public RTTCall(Request creationRequest, Dialog dialog, List<TextListener> messageReceivers) {
         this.creationRequest = creationRequest;
         this.dialog = dialog;
         sipClient = SipClient.getInstance();
         destructionLock = new Semaphore(1);
+        this.messageReceivers = messageReceivers;
+        try {
+            manager = new RtpManager(sipClient.getLocalIP());
+        } catch (UnknownHostException e) {
+            e.printStackTrace();
+        }
     }
 
     /**
@@ -132,15 +156,21 @@ public class RTTCall {
         if (!calling)
             throw new IllegalStateException("not calling anyone - what was accepted?");
         connectCall(remoteIP, remotePort, localRTPPort);
-     /*connected = true;
-        calling = false;
-        setUpStream();*/
     }
 
     private void connectCall(String remoteIP, int remotePort, int localRTPPort) {
         this.remoteIP = remoteIP;
         this.remotePort = remotePort;
         this.localPort = localRTPPort;
+        try {
+            session = manager.createRtpSession(localRTPPort, remoteIP, remotePort);
+            session.addRtpListener(this);
+            session.receiveRTPPackets();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (RtpException e) {
+            e.printStackTrace();
+        }
         connected = true;
         ringing = false;
         calling = false;
@@ -171,5 +201,29 @@ public class RTTCall {
     }
     public boolean isCalling() {
         return calling;
+    }
+
+    @Override
+    public void handleRtpPacketEvent(RtpPacketEvent rtpEvent) {
+        RtpPacket packet = rtpEvent.getRtpPacket();
+        Log.d(TAG, "received some text");
+        for (TextListener receiver : messageReceivers) {
+            receiver.RTTextReceived(packet.toString());
+        }
+    }
+
+    @Override
+    public void handleRtpStatusEvent(RtpStatusEvent rtpEvent) {
+        Log.d(TAG, "!!! RTP STATUS!!");
+    }
+
+    @Override
+    public void handleRtpTimeoutEvent(RtpTimeoutEvent rtpEvent) {
+        Log.d(TAG, "!!! RTP TIMEOUT!!");
+    }
+
+    @Override
+    public void handleRtpErrorEvent(RtpErrorEvent rtpEvent) {
+        Log.e(TAG, "!!! RTP ERROR!!");
     }
 }
