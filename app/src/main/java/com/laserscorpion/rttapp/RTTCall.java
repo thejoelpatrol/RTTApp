@@ -7,7 +7,6 @@ import android.javax.sip.message.Request;
 
 import java.util.concurrent.Semaphore;
 
-import se.omnitor.RtpChat;
 
 /**
  * Created by joel on 2/12/16.
@@ -31,7 +30,6 @@ public class RTTCall {
     private int localPort;
     private int remotePort;
     private String remoteIP;
-    private RtpChat rtpChat;
 
     /**
      * Use this constructor for an incoming call - the requestEvent is the INVITE,
@@ -146,8 +144,6 @@ public class RTTCall {
         connected = true;
         ringing = false;
         calling = false;
-        rtpChat = new RtpChat(remoteIP, localRTPPort, remotePort, false);
-        rtpChat.start();
     }
 
     /**

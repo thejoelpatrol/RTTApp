@@ -26,10 +26,6 @@ dependencies {
     compile 'com.android.support:design:23.1.1'
     compile files('libs/android-sip-stack.jar')
     compile files('libs/log4j-1.2.8.jar')
-    compile files('libs/jmf.jar')
-    compile files('libs/rt.jar')
-    compile files('new_rt.jar')
-    compile files('libs/new_jmf.jar')
 }
 
 
