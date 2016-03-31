@@ -45,9 +45,9 @@ public class RTTCall {
 
     private Semaphore creationLock;
     private Semaphore destructionLock;
-    private boolean ringing;
-    private boolean connected;
-    private boolean calling;
+    private boolean ringing = false;
+    private boolean connected = false;
+    private boolean calling = false;
 
 
     private int localPort;
@@ -91,9 +91,7 @@ public class RTTCall {
         this.messageReceivers = messageReceivers;
         FifoBuffer recvBuf = new FifoBuffer();
         recvThread = new ReceiveThread(recvBuf);
-        recvThread.start();
         printThread = new TextPrintThread(messageReceivers, recvBuf);
-        printThread.start();
         try {
             manager = new RtpManager(sipClient.getLocalIP());
         } catch (UnknownHostException e) {
@@ -177,10 +175,16 @@ public class RTTCall {
     }
 
     private synchronized void connectCall(String remoteIP, int remotePort, int localRTPPort, int t140MapNum) {
+        if (connected)
+            throw new IllegalStateException("can't connect call -- already connected on a call");
+        if (!ringing && !calling)
+            throw new IllegalStateException("can't connect call -- no incoming or outgoing call pending");
         this.remoteIP = remoteIP;
         this.remotePort = remotePort;
         this.localPort = localRTPPort;
         this.t140PayloadNum = t140MapNum;
+        recvThread.start();
+        printThread.start();
         try {
             session = manager.createRtpSession(localRTPPort, remoteIP, remotePort);
             session.addRtpListener(recvThread);
@@ -226,11 +230,9 @@ public class RTTCall {
 
 
     private class ReceiveThread extends Thread implements RtpListener {
-        //private FifoBuffer buffer;
         private RtpTextReceiver textReceiver;
 
         public ReceiveThread(FifoBuffer buffer) {
-            //this.buffer = buffer;
             textReceiver = new RtpTextReceiver(localPort, false, t140PayloadNum, 0, buffer);
         }
 
