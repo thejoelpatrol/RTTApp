@@ -40,13 +40,9 @@ import se.omnitor.protocol.rtp.text.RtpTextBuffer;
  * @author Ingemar Persson, Omnitor AB
  * @author Andreas Piirimets, Omnitor AB
  */
-public class RtpTextReceiver implements Runnable,
-					RTP_actionListener,
-					RTCP_actionListener {
+public class RtpTextReceiver implements RTP_actionListener, RTCP_actionListener {
 
-    private StateThread thisThread = null;
     private RtpTextDePacketizer textDePacketizer;
-    //private Session rtpSession;
 
     private int localPort;
 
@@ -70,8 +66,7 @@ public class RtpTextReceiver implements Runnable,
      * @param redPayloadType The RTP payload number for RED, if used.
      * @param dataBuffer The buffer to write incoming data to
      */
-    public RtpTextReceiver(/*Session rtpSession,*/
-			   int localPort,
+    public RtpTextReceiver(int localPort,
 			   boolean redFlagIncoming,
 			   int t140PayloadType,
 			   int redPayloadType,
@@ -79,7 +74,6 @@ public class RtpTextReceiver implements Runnable,
 
         logger.finest("ENTRY");
 
-        //this.rtpSession = rtpSession;
         this.localPort = localPort;
 		this.dataBuffer = dataBuffer;
 
@@ -102,87 +96,7 @@ public class RtpTextReceiver implements Runnable,
 	}
 
     /**
-     * Writes a log comment.
-     *
-     * @throws Throwable (This will never be thrown, it is just a requirement
-     * from the finalize() funciton that this Throw clause should be here.)
-     */
-    protected void finalize() throws Throwable
-    {
-        logger.finest("Finalizing instance of RtpTextReceiver.");
-    }
-
-    /**
-     * Initializes the reception thread and starts it.
-     *
-     */
-    public void start()
-    {
-		logger.finest("Starting text receiver");
-        thisThread = new StateThread(this, "RTP Text Receiver");
-        thisThread.start();
-    }
-
-    /**
-     * Starts the reception thread. Actually, this thread doesn't do very
-     * much. It starts all listeners and just sleeps until the transmission
-     * is stopped. Then it destroys the thread.
-     *
-	 * Actually this does basically nothing now that we are using a different RTP session.
-	 * Probably delete this if things work out right.
-     */
-    public void run() {
-		logger.finest("ENTRY");
-
-        //rtpSession.openRTPReceiveSocket(localPort);
-        //rtpSession.startRTPThread();
-        //rtpSession.createAndStartRTCPReceiverThread(localPort+1);
-
-        /*rtpSession.addRTP_actionListener(this);
-        rtpSession.addRTCP_actionListener(this);*/
-
-        logger.finest("Ready to receive.");
-
-		localReceiverIsReady = true;
-
-        while (thisThread.checkState() != StateThread.STOP)
-        {
-            try
-            {
-                Thread.sleep(100);
-            } catch (InterruptedException e)
-            {
-		// Ignore any interruption here.
-            }
-        }
-        // Finally do..
-        logger.finest("Receive thread stopped.");
-
-        // Release thread
-        thisThread = null;
-    }
-
-    /**
-     * Stops the reception of RTP text.
-     *
-     */
-    public synchronized void stop()
-    {
-        logger.finest("Stopping receive thread.");
-
-		if (thisThread != null) {
-			thisThread.setState(StateThread.STOP);
-			thisThread.interrupt();
-		}
-		/*if (rtpSession != null) {
-			rtpSession.stopRTPThread();
-			rtpSession.stopRTCPReceiverThread();
-		}*/
-    }
-
-    /**
      * Gets the local RTP port.
-     *
      * @return The local RTP port.
      */
     public int getLocalPort()
@@ -193,7 +107,6 @@ public class RtpTextReceiver implements Runnable,
     /**
      * Handles incoming RTP text packets. The packet is depacketized and put
      * into the buffer, which GUI will read from.
-     *
      * @param rtpPacket The incoming packet.
      */
     public void handleRTPEvent(RTPPacket rtpPacket)
@@ -214,7 +127,6 @@ public class RtpTextReceiver implements Runnable,
 
 		rtpPacket.setPayloadData(null);
 		byte[] datap = outBuffer.getData();
-		//Log.d("RTPTextReceiver", "In outbuffer: " + new String(datap, StandardCharsets.UTF_8));
 
 		//EZ: T140 redundancy filter
 		byte[] data = redFilter.filterInput(datap);
@@ -222,14 +134,21 @@ public class RtpTextReceiver implements Runnable,
         if (data != null) {
 			logger.finest("Data to buffer: " + new String(data));
 			dataBuffer.setData(data);
-			/*try {
-				Log.d("RTPTextReceiver", "Added to fifo buffer: " + new String(dataBuffer.getData(), StandardCharsets.UTF_8));
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}*/
-
 		}
     }
+
+
+
+
+	/* **********************************************
+	 *  Not using anything below this point, but we
+	 *  may want to later, e.g. RTCP
+	 * **********************************************
+	 */
+
+
+
+
 
     /**
      * When this function is invoked (when an RTCP RR packet has arrived), it
@@ -241,25 +160,6 @@ public class RtpTextReceiver implements Runnable,
     public void handleRTCPEvent ( RTCPReceiverReportPacket rrpkt)
     {
 	remoteReceiverIsReady = true;
-	/*
-        logger.finest("\n**** ActionListener RTCP RR Packet: *****\n" +
-		      "SSRC = " + Long.toHexString(RRpkt.SenderSSRC) +
-		      "\n" +
-		      "ReportBlock = " + RRpkt.containsReportBlock +
-		      "\n" +
-		      "FractionLost = " + RRpkt.ReportBlock.FractionLost +
-		      "\n"
-		      + "CumPktsLost = " +
-		      RRpkt.ReportBlock.CumulativeNumberOfPacketsLost + "\n"
-		      + "ExtHighSqRcvd = " +
-		      RRpkt.ReportBlock.ExtendedHighestSequenceNumberReceived
-		      + "\n"
-		      + "IntJitter = " +
-		      RRpkt.ReportBlock.InterarrivalJitter   + "\n"
-		      + "LastSR = " + RRpkt.ReportBlock.LastSR + "\n"
-		      + "Delay_LastSR = " +  RRpkt.ReportBlock.Delay_LastSR +
-		      "\n" );
-	*/
     }
 
     /**
@@ -268,40 +168,6 @@ public class RtpTextReceiver implements Runnable,
      * @param srpkt The incoming packet
      */
     public void handleRTCPEvent ( RTCPSenderReportPacket srpkt) {
-	/*
-	logger.finest ("\n**** ActionListener RTCP SR Packet: *****\n"
-		       + "SSRC = " +
-		       Long.toHexString(SRpkt.SenderSSRC) + "\n"
-		       + "SenderOctetCount:" +
-		       SRpkt.SenderInfo.SenderOctetCount + "\n"
-		       + " SenderPacketCount:" +
-		       SRpkt.SenderInfo.SenderPacketCount + "\n"
-		       + "RTPTimeStamp" +
-		       SRpkt.SenderInfo.RTPTimeStamp + "\n"
-		       + "NTPTimeStampLeastSignificant" +
-		       SRpkt.SenderInfo.NTPTimeStampLeastSignificant + "\n"
-		       +  "NTPTimeStampMostSignificant" +
-		       SRpkt.SenderInfo.NTPTimeStampMostSignificant + "\n"
-		       + "ReportBlock = " +
-		       SRpkt.containsReportBlock + "\n" );
-
-        if ( SRpkt.containsReportBlock )
-            logger.finest ("FractionLost = " +
-			   SRpkt.ReportBlock.FractionLost  + "\n"
-			   +  "CumPktsLost = " +
-			   SRpkt.ReportBlock.CumulativeNumberOfPacketsLost +
-			   "\n"
-			   +  "ExtHighSqRcvd = " +
-			   SRpkt.ReportBlock.
-			   ExtendedHighestSequenceNumberReceived  + "\n"
-			   +  "IntJitter = " +
-			   SRpkt.ReportBlock.InterarrivalJitter   + "\n"
-			   +  "LastSR = " +
-			   SRpkt.ReportBlock.LastSR + "\n"
-			   +  "Delay_LastSR = " +
-			   SRpkt.ReportBlock.Delay_LastSR  + "\n"
-			   );
-	*/
     }
 
     /**
@@ -310,13 +176,6 @@ public class RtpTextReceiver implements Runnable,
      * @param sdespkt The incoming packet
      */
     public void handleRTCPEvent ( RTCPSDESPacket sdespkt) {
-	/*
-      logger.finest (    "\n**** ActionListener RTCP SDES: *****\n"
-                                + "SDES Type: " + sdespkt.SDESItem.Type + "\n"
-                                + "SDES Value: " + sdespkt.SDESItem.Value +
-                                "\n"
-                                + "**************************************\n");
-	*/
     }
 
     /**
@@ -325,13 +184,6 @@ public class RtpTextReceiver implements Runnable,
      * @param byepkt The incoming packet
      */
     public void handleRTCPEvent ( RTCPBYEPacket byepkt) {
-	/*
-        logger.finest (    "\n**** ActionListener RTCP BYE: *****\n"
-                                + "BYE SSRC: " + byepkt.SSRC + "\n"
-                                + "REason For Leaving " +
-                                byepkt.ReasonForLeaving + "\n"
-                                + "**************************************\n");
-	*/
     }
 
     /**
