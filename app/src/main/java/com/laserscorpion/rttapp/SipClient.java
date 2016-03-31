@@ -732,7 +732,6 @@ public class SipClient implements SipListener {
                 ServerTransaction transaction = respondGeneric(requestEvent, null, Response.RINGING);
                 currentCall = new RTTCall(requestEvent, transaction, messageReceivers);
                 currentCall.setRinging();
-                Log.d(TAG, "we've returned from the RTT call...");
                 callReceiver.callReceived();
             } else {
                 // TODO respond 4xx

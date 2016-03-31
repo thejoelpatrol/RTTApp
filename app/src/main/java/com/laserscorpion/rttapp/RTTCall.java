@@ -91,6 +91,7 @@ public class RTTCall {
         this.messageReceivers = messageReceivers;
         FifoBuffer recvBuf = new FifoBuffer();
         recvThread = new ReceiveThread(recvBuf);
+        recvThread.start();
         printThread = new TextPrintThread(messageReceivers, recvBuf);
         printThread.start();
         try {
@@ -234,11 +235,21 @@ public class RTTCall {
         }
 
         @Override
+        public void run() {
+            while (true) {
+                // please don't die on us, thread!
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) { /* go back to sleep */ }
+            }
+        }
+
+        @Override
         public void handleRtpPacketEvent(RtpPacketEvent rtpEvent) {
             RtpPacket packet = rtpEvent.getRtpPacket();
             RTPPacket convertedPacket = convertPacket(packet);
             textReceiver.handleRTPEvent(convertedPacket);
-            Log.d(TAG, "received some text");
+            //Log.d(TAG, "received some text");
         }
 
         private RTPPacket convertPacket(RtpPacket incoming) {
