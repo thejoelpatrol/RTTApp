@@ -55,11 +55,11 @@ public class RTTCall {
     private String remoteIP;
 
     private RtpManager manager;
-    private List<TextListener> messageReceivers;
     private RtpSession session;
     private ReceiveThread recvThread;
     private TextPrintThread printThread;
     private int t140PayloadNum;
+
     /**
      * Use this constructor for an incoming call - the requestEvent is the INVITE,
      * the transaction is the ServerTransaction used to respond to the INVITE,
@@ -88,7 +88,6 @@ public class RTTCall {
         this.dialog = dialog;
         sipClient = SipClient.getInstance();
         destructionLock = new Semaphore(1);
-        this.messageReceivers = messageReceivers;
         FifoBuffer recvBuf = new FifoBuffer();
         recvThread = new ReceiveThread(recvBuf);
         printThread = new TextPrintThread(messageReceivers, recvBuf);
@@ -156,10 +155,8 @@ public class RTTCall {
         if (!ringing)
             throw new IllegalStateException("call is not ringing - cannot accept");
         connectCall(remoteIP, remotePort, localRTPPort, t140MapNum);
-        /*connected = true;
-        ringing = false;
-        setUpStream();*/
     }
+
     /**
      *
      * @param remoteIP the IP of the remote party for the RTP stream
@@ -209,6 +206,7 @@ public class RTTCall {
             connected = false;
             calling = false;
             printThread.stopPrinting();
+            recvThread.stopReceiving();
             session.stopRtpPacketReceiver();
             session.shutDown();
         } else
@@ -229,16 +227,31 @@ public class RTTCall {
     }
 
 
+    /**
+     * This thread receives incoming RTP packets from JRTP's session,
+     * repackages them into Omnitor's expected RTPPacket format, and
+     * hands them over to a modified version of Omnitor's RtpTextReceiver,
+     * which removes duplicates and extracts the text and puts it in the
+     * FIFO buffer for PrintThread to read.
+     */
     private class ReceiveThread extends Thread implements RtpListener {
+        private boolean stop = false;
+
         private RtpTextReceiver textReceiver;
 
         public ReceiveThread(FifoBuffer buffer) {
             textReceiver = new RtpTextReceiver(localPort, false, t140PayloadNum, 0, buffer);
         }
 
+        /* synchronizing on the boolean stop is probably not necessary */
+        public void stopReceiving() {
+            stop = true;
+            // now run() completes and the thread dies
+        }
+
         @Override
         public void run() {
-            while (true) {
+            while (!stop) {
                 // please don't die on us, thread!
                 try {
                     Thread.sleep(1000);
@@ -251,7 +264,6 @@ public class RTTCall {
             RtpPacket packet = rtpEvent.getRtpPacket();
             RTPPacket convertedPacket = convertPacket(packet);
             textReceiver.handleRTPEvent(convertedPacket);
-            //Log.d(TAG, "received some text");
         }
 
         private RTPPacket convertPacket(RtpPacket incoming) {
@@ -279,18 +291,21 @@ public class RTTCall {
         public void handleRtpErrorEvent(RtpErrorEvent rtpEvent) {
             Log.e(TAG, "!!! RTP ERROR!!");
         }
-
     }
 
+    /**
+     * This thread is constantly waiting for ReceiveThread to add
+     * some more text to the FIFO buffer, which it removes and prints
+     * it to the UI class(es) that are waiting to display it.
+     */
     private class TextPrintThread extends Thread {
         List<TextListener> messageReceivers;
         FifoBuffer buffer;
-        boolean stop;
+        boolean stop = false;
 
         public TextPrintThread(List<TextListener> messageReceivers, FifoBuffer buffer) {
             this.messageReceivers = messageReceivers;
             this.buffer = buffer;
-            stop = false;
         }
 
         /* synchronizing on the boolean stop is probably not necessary */
@@ -299,6 +314,7 @@ public class RTTCall {
             synchronized (buffer) {
                 buffer.notifyAll();
             }
+            // now run() completes and the thread dies
         }
 
         @Override
