@@ -512,10 +512,10 @@ public class SipClient implements SipListener {
                 receiveCall(requestEvent);
                 break;
             case Request.ACK:
-                //Log.d(TAG, "Not really implemented yet");
                 if (currentCall != null && currentCall.isRinging()) {
                     Request originalInvite = currentCall.getCreationEvent().getRequest();
-                    currentCall.accept(getContactIP(originalInvite), getT140PortNum(originalInvite), port+1);
+                    int suggestedT140Map = getT140MapNum(originalInvite);
+                    currentCall.accept(getContactIP(originalInvite), getT140PortNum(originalInvite), port+1, suggestedT140Map);
                 }
                 else
                     Log.e(TAG, "stray ACK, what do I do? In response to a 488?");
@@ -623,8 +623,8 @@ public class SipClient implements SipListener {
     SDP library, but as far as I can tell, all it does is structure the string into
     discrete lines of different types
      */
-    private int getT140MapNum(Request otherPartyRequest) {
-        String body = new String(otherPartyRequest.getRawContent(), StandardCharsets.UTF_8);
+    private int getT140MapNum(Message incomingRequestResponse) {
+        String body = new String(incomingRequestResponse.getRawContent(), StandardCharsets.UTF_8);
         try {
             SessionDescription suggestedSession = SDPFactory.createSessionDescription(body);
             Vector<MediaDescription> mediaDescriptions = suggestedSession.getMediaDescriptions(true);
@@ -732,6 +732,7 @@ public class SipClient implements SipListener {
                 ServerTransaction transaction = respondGeneric(requestEvent, null, Response.RINGING);
                 currentCall = new RTTCall(requestEvent, transaction, messageReceivers);
                 currentCall.setRinging();
+                Log.d(TAG, "we've returned from the RTT call...");
                 callReceiver.callReceived();
             } else {
                 // TODO respond 4xx
@@ -935,7 +936,8 @@ public class SipClient implements SipListener {
         currentCall.addDialog(dialog);
         if (sessionIsAcceptable(response)) {
             Log.d(TAG, "acceptable!");
-            currentCall.callAccepted(getContactIP(response), getT140PortNum(response), port+1);
+            int agreedT140MapNum = getT140MapNum(response);
+            currentCall.callAccepted(getContactIP(response), getT140PortNum(response), port+1, agreedT140MapNum);
         } else {
             Log.d(TAG, "not acceptable");
             sendBye(dialog);
@@ -955,9 +957,9 @@ public class SipClient implements SipListener {
     }
 
     private boolean sessionIsAcceptable(Response response) {
-        /* this is slightly imprecise because we are not looking specifically
+        /* this is imprecise because we are not looking specifically
         at the ContentTypeHeader and are not looking specifically inside the media
-        descriptions and attributes in the SDP ... but it works */
+        descriptions and attributes in the SDP ... but it works for now */
         ListIterator<Header> list = response.getHeaders("Content-Type");
         while (list.hasNext()) {
             Header header = list.next();

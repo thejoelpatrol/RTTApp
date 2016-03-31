@@ -6,9 +6,13 @@ import android.javax.sip.ServerTransaction;
 import android.javax.sip.message.Request;
 import android.util.Log;
 
+import org.w3c.dom.Text;
+
 import java.io.IOException;
 import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Semaphore;
 
 import gov.nist.jrtp.RtpErrorEvent;
@@ -21,11 +25,15 @@ import gov.nist.jrtp.RtpSession;
 import gov.nist.jrtp.RtpStatusEvent;
 import gov.nist.jrtp.RtpTimeoutEvent;
 
+import se.omnitor.protocol.rtp.RtpTextReceiver;
+import se.omnitor.protocol.rtp.packets.RTPPacket;
+import se.omnitor.util.*;
+
 
 /**
  * Created by joel on 2/12/16.
  */
-public class RTTCall implements RtpListener {
+public class RTTCall {
     private static final String TAG = "RTTCall";
     private SipClient sipClient;
     private Dialog dialog;
@@ -49,6 +57,9 @@ public class RTTCall implements RtpListener {
     private RtpManager manager;
     private List<TextListener> messageReceivers;
     private RtpSession session;
+    private ReceiveThread recvThread;
+    private TextPrintThread printThread;
+    private int t140PayloadNum;
     /**
      * Use this constructor for an incoming call - the requestEvent is the INVITE,
      * the transaction is the ServerTransaction used to respond to the INVITE,
@@ -78,6 +89,10 @@ public class RTTCall implements RtpListener {
         sipClient = SipClient.getInstance();
         destructionLock = new Semaphore(1);
         this.messageReceivers = messageReceivers;
+        FifoBuffer recvBuf = new FifoBuffer();
+        recvThread = new ReceiveThread(recvBuf);
+        printThread = new TextPrintThread(messageReceivers, recvBuf);
+        printThread.start();
         try {
             manager = new RtpManager(sipClient.getLocalIP());
         } catch (UnknownHostException e) {
@@ -98,7 +113,7 @@ public class RTTCall implements RtpListener {
      * available at creation of the RTTCall
      * @param dialog the new Dialog to associate with the call
      */
-    public void addDialog(Dialog dialog) {
+    public synchronized void addDialog(Dialog dialog) {
         this.dialog = dialog;
     }
 
@@ -123,24 +138,25 @@ public class RTTCall implements RtpListener {
         return newRequest.equals(creationRequest);
     }
 
-    public void setCalling() {
+    public synchronized void setCalling() {
         calling = true;
     }
-    public void setRinging() {
+    public synchronized void setRinging() {
         ringing = true;
     }
 
     /**
-     *
+     * Connect an incoming call that was previously ringing
      * @param remoteIP the IP of the remote party for the RTP stream
      * @param remotePort the port of the remote party for the RTP stream
      * @param localRTPPort the local port to be used for the RTP stream
-     * @throws IllegalStateException if no call is currently ringing
+     * @param t140MapNum the RTP payload map number corresponding to t140 in the agreed session description
+     * @throws IllegalStateException if no call is currently ringing, or if setT140MapNum() has not yet been called
      */
-    public void accept(String remoteIP, int remotePort, int localRTPPort) throws IllegalStateException {
+    public void accept(String remoteIP, int remotePort, int localRTPPort, int t140MapNum) throws IllegalStateException {
         if (!ringing)
             throw new IllegalStateException("call is not ringing - cannot accept");
-        connectCall(remoteIP, remotePort, localRTPPort);
+        connectCall(remoteIP, remotePort, localRTPPort, t140MapNum);
         /*connected = true;
         ringing = false;
         setUpStream();*/
@@ -150,21 +166,23 @@ public class RTTCall implements RtpListener {
      * @param remoteIP the IP of the remote party for the RTP stream
      * @param remotePort the port of the remote party for the RTP stream
      * @param localRTPPort the local port to be used for the RTP stream
+     * @param t140MapNum the RTP payload map number corresponding to t140 in the agreed session description
      * @throws IllegalStateException if no call is currently outgoing
      */
-    public void callAccepted(String remoteIP, int remotePort, int localRTPPort) {
+    public void callAccepted(String remoteIP, int remotePort, int localRTPPort, int t140MapNum) {
         if (!calling)
             throw new IllegalStateException("not calling anyone - what was accepted?");
-        connectCall(remoteIP, remotePort, localRTPPort);
+        connectCall(remoteIP, remotePort, localRTPPort, t140MapNum);
     }
 
-    private void connectCall(String remoteIP, int remotePort, int localRTPPort) {
+    private synchronized void connectCall(String remoteIP, int remotePort, int localRTPPort, int t140MapNum) {
         this.remoteIP = remoteIP;
         this.remotePort = remotePort;
         this.localPort = localRTPPort;
+        this.t140PayloadNum = t140MapNum;
         try {
             session = manager.createRtpSession(localRTPPort, remoteIP, remotePort);
-            session.addRtpListener(this);
+            session.addRtpListener(recvThread);
             session.receiveRTPPackets();
         } catch (IOException e) {
             e.printStackTrace();
@@ -180,12 +198,14 @@ public class RTTCall implements RtpListener {
      * End a call at any stage. Invoking multiple times has no effect; the
      * first invocation ends the session.
      */
-    public void end() {
+    public synchronized void end() {
         if (destructionLock.tryAcquire()) {
             ringing = false;
             connected = false;
             calling = false;
-            // TODO tear down RTP session
+            printThread.stopPrinting();
+            session.stopRtpPacketReceiver();
+            session.shutDown();
         } else
             return;
         /*  We do not release destructionLock.
@@ -203,27 +223,83 @@ public class RTTCall implements RtpListener {
         return calling;
     }
 
-    @Override
-    public void handleRtpPacketEvent(RtpPacketEvent rtpEvent) {
-        RtpPacket packet = rtpEvent.getRtpPacket();
-        Log.d(TAG, "received some text");
-        for (TextListener receiver : messageReceivers) {
-            receiver.RTTextReceived(packet.toString());
+
+    private class ReceiveThread extends Thread implements RtpListener {
+        //private FifoBuffer buffer;
+        private RtpTextReceiver textReceiver;
+
+        public ReceiveThread(FifoBuffer buffer) {
+            //this.buffer = buffer;
+            textReceiver = new RtpTextReceiver(localPort, false, t140PayloadNum, 0, buffer);
         }
+
+        @Override
+        public void handleRtpPacketEvent(RtpPacketEvent rtpEvent) {
+            RtpPacket packet = rtpEvent.getRtpPacket();
+            RTPPacket convertedPacket = convertPacket(packet);
+            textReceiver.handleRTPEvent(convertedPacket);
+            Log.d(TAG, "received some text");
+        }
+
+        private RTPPacket convertPacket(RtpPacket incoming) {
+            RTPPacket packet = new RTPPacket();
+            packet.setCsrcCount(incoming.getCC());
+            packet.setSequenceNumber(incoming.getSN());
+            packet.setTimeStamp(incoming.getTS());
+            packet.setSsrc(incoming.getSSRC());
+            packet.setPayloadData(incoming.getPayload());
+            packet.setMarker(incoming.getM() == 1 ? true : false);
+            return packet;
+        }
+
+        @Override
+        public void handleRtpStatusEvent(RtpStatusEvent rtpEvent) {
+            Log.d(TAG, "!!! RTP STATUS!!");
+        }
+
+        @Override
+        public void handleRtpTimeoutEvent(RtpTimeoutEvent rtpEvent) {
+            Log.d(TAG, "!!! RTP TIMEOUT!!");
+        }
+
+        @Override
+        public void handleRtpErrorEvent(RtpErrorEvent rtpEvent) {
+            Log.e(TAG, "!!! RTP ERROR!!");
+        }
+
     }
 
-    @Override
-    public void handleRtpStatusEvent(RtpStatusEvent rtpEvent) {
-        Log.d(TAG, "!!! RTP STATUS!!");
-    }
+    private class TextPrintThread extends Thread {
+        List<TextListener> messageReceivers;
+        FifoBuffer buffer;
+        boolean stop;
 
-    @Override
-    public void handleRtpTimeoutEvent(RtpTimeoutEvent rtpEvent) {
-        Log.d(TAG, "!!! RTP TIMEOUT!!");
-    }
+        public TextPrintThread(List<TextListener> messageReceivers, FifoBuffer buffer) {
+            this.messageReceivers = messageReceivers;
+            this.buffer = buffer;
+            stop = false;
+        }
 
-    @Override
-    public void handleRtpErrorEvent(RtpErrorEvent rtpEvent) {
-        Log.e(TAG, "!!! RTP ERROR!!");
+        /* synchronizing on the boolean stop is probably not necessary */
+        public void stopPrinting() {
+            stop = true;
+            buffer.notify();
+        }
+
+        @Override
+        public void run() {
+            byte[] received;
+            while (!stop) {
+                try {
+                    received = buffer.getData(); // this blocks until there is something in the fifo
+                    if (received != null) {
+                        for (TextListener receiver : messageReceivers) {
+                            String text = new String(received, StandardCharsets.UTF_8);
+                            receiver.RTTextReceived(text);
+                        }
+                    }
+                } catch (InterruptedException e) {/* that's fine */}
+            }
+        }
     }
 }

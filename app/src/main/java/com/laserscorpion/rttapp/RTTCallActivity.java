@@ -53,7 +53,7 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
     }
 
 
-    private void addText(final String text) {
+    private synchronized void addText(final String text) {
         final TextView view = (TextView)findViewById(R.id.textview);
         runOnUiThread(new Runnable() {
             @Override
