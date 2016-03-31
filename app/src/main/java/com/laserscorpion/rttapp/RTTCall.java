@@ -294,7 +294,9 @@ public class RTTCall {
         /* synchronizing on the boolean stop is probably not necessary */
         public void stopPrinting() {
             stop = true;
-            buffer.notify();
+            synchronized (buffer) {
+                buffer.notifyAll();
+            }
         }
 
         @Override
