@@ -534,6 +534,7 @@ public class SipClient implements SipListener {
                     int suggestedT140Map = getT140MapNum(originalInvite, mediaType.T140);
                     int suggestedT140RedMap = getT140MapNum(originalInvite, mediaType.T140RED);
                     currentCall.accept(getContactIP(originalInvite), getT140PortNum(originalInvite), port+1, suggestedT140Map, suggestedT140RedMap);
+                    currentCall.addDialog(requestEvent.getDialog());
                 }
                 else
                     Log.e(TAG, "stray ACK, what do I do? In response to a 488?");
