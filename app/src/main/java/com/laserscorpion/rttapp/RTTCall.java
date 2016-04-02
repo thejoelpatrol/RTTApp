@@ -210,10 +210,14 @@ public class RTTCall {
             ringing = false;
             connected = false;
             calling = false;
-            printThread.stopPrinting();
-            recvThread.stopReceiving();
-            session.stopRtpPacketReceiver();
-            session.shutDown();
+            if (printThread != null)
+                printThread.stopPrinting();
+            if (recvThread != null)
+                recvThread.stopReceiving();
+            if (session != null) {
+                session.stopRtpPacketReceiver();
+                session.shutDown();
+            }
         } else
             return;
         /*  We do not release destructionLock.
