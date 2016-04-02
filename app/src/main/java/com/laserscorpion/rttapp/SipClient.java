@@ -56,6 +56,7 @@ public class SipClient implements SipListener {
     private static final int DEFAULT_REGISTRATION_LEN = 600;
     private static final int CALL_RINGING_TIME = 30;
     private static final String ALLOWED_METHODS[] = {Request.ACK, Request.BYE, Request.INVITE, Request.OPTIONS, Request.CANCEL};
+    private static final int SAMPLE_RATE = 1000; // defined by RFC 4103 p.15
     private android.content.Context parent;
     private SipFactory sipFactory;
     private SipStack sipStack;
@@ -81,6 +82,7 @@ public class SipClient implements SipListener {
     private List<SessionListener> sessionReceivers;
     private CallReceiver callReceiver;
     private SecureRandom randomGen;
+    private enum mediaType  {T140, T140RED};
 
     /*  callLock is used in a fairly normal way: it must be held whenever making a change
         to currentCall. However, it is sometimes held by an earlier action, a precondition
@@ -419,7 +421,7 @@ public class SipClient implements SipListener {
             request.addHeader(localContactHeader);
             ExpiresHeader expiresHeader = headerFactory.createExpiresHeader(CALL_RINGING_TIME);
             request.addHeader(expiresHeader);
-            addSDPContentAndHeader(request, 0);
+            addSDPContentAndHeader(request, 0, 0);
             SipRequester requester = new SipRequester(sipProvider);
             requester.execute(request);
             currentCall = new RTTCall(request, null, messageReceivers);
@@ -446,8 +448,8 @@ public class SipClient implements SipListener {
         return currentCall != null;
     }
 
-    private void addSDPContentAndHeader(Message message, int preferredMap) {
-        String sdp = createSDPContent(preferredMap);
+    private void addSDPContentAndHeader(Message message, int preferredT140Map, int preferredRedMap) {
+        String sdp = createSDPContent(preferredT140Map, preferredRedMap);
         ContentTypeHeader typeHeader;
         try {
             typeHeader = headerFactory.createContentTypeHeader("application", "sdp");
@@ -459,15 +461,20 @@ public class SipClient implements SipListener {
 
     }
 
-    private String createSDPContent(int mapNum) {
-        final int SAMPLE_RATE = 1000; // defined by RFC 4103 p.15
+    private String createSDPContent(int t140MapNum, int redMapNum) {
         int sessionID = Math.abs(randomGen.nextInt());
-        if (mapNum == 0)
-            mapNum = 100;
+        if (t140MapNum == 0)
+            t140MapNum = 100;
+        if (redMapNum == 0)
+            redMapNum = 101;
         try {
-            int codecs[] = {mapNum};
+            int codecs[] = {t140MapNum, redMapNum};
             MediaDescription textMedia = SDPFactory.createMediaDescription("text", port+1, 1, "RTP/AVP", codecs);
-            textMedia.setAttribute("rtpmap", mapNum + " t140/" + SAMPLE_RATE);
+            textMedia.setAttribute("rtpmap", t140MapNum + " t140/" + SAMPLE_RATE);
+            AttributeField redAttr = new AttributeField();
+            redAttr.setName("rtpmap");
+            redAttr.setValue(redMapNum + " red/" + SAMPLE_RATE);
+            textMedia.addAttribute(redAttr);
             AttributeField sendrecv = new AttributeField();
             sendrecv.setName("sendrecv");
             sendrecv.setValueAllowNull(null);
@@ -514,7 +521,7 @@ public class SipClient implements SipListener {
             case Request.ACK:
                 if (currentCall != null && currentCall.isRinging()) {
                     Request originalInvite = currentCall.getCreationEvent().getRequest();
-                    int suggestedT140Map = getT140MapNum(originalInvite);
+                    int suggestedT140Map = getT140MapNum(originalInvite, mediaType.T140);
                     currentCall.accept(getContactIP(originalInvite), getT140PortNum(originalInvite), port+1, suggestedT140Map);
                 }
                 else
@@ -601,8 +608,9 @@ public class SipClient implements SipListener {
         Request request = currentCall.getCreationRequest();
         try {
             Response response = messageFactory.createResponse(Response.OK, request);
-            int suggestedT140Map = getT140MapNum(request);
-            addSDPContentAndHeader(response, suggestedT140Map);
+            int suggestedT140Map = getT140MapNum(request, mediaType.T140);
+            int suggestedT140RedMap = getT140MapNum(request, mediaType.T140RED);
+            addSDPContentAndHeader(response, suggestedT140Map, suggestedT140RedMap);
             response.addHeader(localContactHeader);
             if (request.getHeader("Accept") != null) {
                 // TODO send the message body that this request is demanding
@@ -623,8 +631,10 @@ public class SipClient implements SipListener {
     SDP library, but as far as I can tell, all it does is structure the string into
     discrete lines of different types
      */
-    private int getT140MapNum(Message incomingRequestResponse) {
+    private int getT140MapNum(Message incomingRequestResponse, mediaType mediaType) {
         String body = new String(incomingRequestResponse.getRawContent(), StandardCharsets.UTF_8);
+        String mediaName = (mediaType == mediaType.T140) ? "t140" : "red";
+        String pattern = "[0-9]+ " + mediaName + "/" + SAMPLE_RATE;
         try {
             SessionDescription suggestedSession = SDPFactory.createSessionDescription(body);
             Vector<MediaDescription> mediaDescriptions = suggestedSession.getMediaDescriptions(true);
@@ -635,10 +645,14 @@ public class SipClient implements SipListener {
                     for (Attribute attr : attributes) {
                         String attrValue = attr.getValue().toLowerCase();
                         String attrName = attr.getName();
-                        if (attrName.equals("rtpmap") && attrValue.contains("t140") && !attrValue.contains("red")) {
+                        if (attrName.equals("rtpmap") && attrValue.matches(pattern)) {
                             String mapNum = attrValue.split(" ")[0];
                             return Integer.decode(mapNum);
                         }
+                        /*if (attrName.equals("rtpmap") && attrValue.contains("t140") && !attrValue.contains("red")) {
+                            String mapNum = attrValue.split(" ")[0];
+                            return Integer.decode(mapNum);
+                        }*/
                     }
                 }
             }
@@ -935,7 +949,7 @@ public class SipClient implements SipListener {
         currentCall.addDialog(dialog);
         if (sessionIsAcceptable(response)) {
             Log.d(TAG, "acceptable!");
-            int agreedT140MapNum = getT140MapNum(response);
+            int agreedT140MapNum = getT140MapNum(response, mediaType.T140);
             currentCall.callAccepted(getContactIP(response), getT140PortNum(response), port+1, agreedT140MapNum);
         } else {
             Log.d(TAG, "not acceptable");
