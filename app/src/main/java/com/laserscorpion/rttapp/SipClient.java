@@ -475,10 +475,12 @@ public class SipClient implements SipListener {
             redAttr.setName("rtpmap");
             redAttr.setValue(redMapNum + " red/" + SAMPLE_RATE);
             textMedia.addAttribute(redAttr);
+            textMedia.setAttribute("fmtp", redMapNum + " " + t140MapNum + "/" + t140MapNum + "/" + t140MapNum + "/" + t140MapNum); // 4 levels of red
             AttributeField sendrecv = new AttributeField();
             sendrecv.setName("sendrecv");
             sendrecv.setValueAllowNull(null);
             textMedia.addAttribute(sendrecv);
+
 
             /* creating the session description requires checking the IP address (poorly)
                this is a "network" operation so isn't normally allowed by Android on the main thread
@@ -522,7 +524,8 @@ public class SipClient implements SipListener {
                 if (currentCall != null && currentCall.isRinging()) {
                     Request originalInvite = currentCall.getCreationEvent().getRequest();
                     int suggestedT140Map = getT140MapNum(originalInvite, mediaType.T140);
-                    currentCall.accept(getContactIP(originalInvite), getT140PortNum(originalInvite), port+1, suggestedT140Map);
+                    int suggestedT140RedMap = getT140MapNum(originalInvite, mediaType.T140RED);
+                    currentCall.accept(getContactIP(originalInvite), getT140PortNum(originalInvite), port+1, suggestedT140Map, suggestedT140RedMap);
                 }
                 else
                     Log.e(TAG, "stray ACK, what do I do? In response to a 488?");

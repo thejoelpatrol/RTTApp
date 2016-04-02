@@ -56,9 +56,11 @@ public class RTTCall {
 
     private RtpManager manager;
     private RtpSession session;
+    private FifoBuffer recvBuf;
     private ReceiveThread recvThread;
     private TextPrintThread printThread;
     private int t140PayloadNum;
+    private int t140RedPayloadNum;
 
     /**
      * Use this constructor for an incoming call - the requestEvent is the INVITE,
@@ -88,9 +90,9 @@ public class RTTCall {
         this.dialog = dialog;
         sipClient = SipClient.getInstance();
         destructionLock = new Semaphore(1);
-        FifoBuffer recvBuf = new FifoBuffer();
-        recvThread = new ReceiveThread(recvBuf);
+        recvBuf = new FifoBuffer();
         printThread = new TextPrintThread(messageReceivers, recvBuf);
+        printThread.start();
         try {
             manager = new RtpManager(sipClient.getLocalIP());
         } catch (UnknownHostException e) {
@@ -149,12 +151,14 @@ public class RTTCall {
      * @param remotePort the port of the remote party for the RTP stream
      * @param localRTPPort the local port to be used for the RTP stream
      * @param t140MapNum the RTP payload map number corresponding to t140 in the agreed session description
+     * @param t140RedMapNum must be 0 if not using redundancy! This is he RTP payload map number corresponding to
+     *                      "red", the redundant media type, in the agreed session description
      * @throws IllegalStateException if no call is currently ringing, or if setT140MapNum() has not yet been called
      */
-    public void accept(String remoteIP, int remotePort, int localRTPPort, int t140MapNum) throws IllegalStateException {
+    public void accept(String remoteIP, int remotePort, int localRTPPort, int t140MapNum, int t140RedMapNum) throws IllegalStateException {
         if (!ringing)
             throw new IllegalStateException("call is not ringing - cannot accept");
-        connectCall(remoteIP, remotePort, localRTPPort, t140MapNum);
+        connectCall(remoteIP, remotePort, localRTPPort, t140MapNum, t140RedMapNum);
     }
 
     /**
@@ -168,10 +172,10 @@ public class RTTCall {
     public void callAccepted(String remoteIP, int remotePort, int localRTPPort, int t140MapNum) {
         if (!calling)
             throw new IllegalStateException("not calling anyone - what was accepted?");
-        connectCall(remoteIP, remotePort, localRTPPort, t140MapNum);
+        connectCall(remoteIP, remotePort, localRTPPort, t140MapNum, 0);
     }
 
-    private synchronized void connectCall(String remoteIP, int remotePort, int localRTPPort, int t140MapNum) {
+    private synchronized void connectCall(String remoteIP, int remotePort, int localRTPPort, int t140MapNum, int t140RedMapNum) {
         if (connected)
             throw new IllegalStateException("can't connect call -- already connected on a call");
         if (!ringing && !calling)
@@ -180,8 +184,9 @@ public class RTTCall {
         this.remotePort = remotePort;
         this.localPort = localRTPPort;
         this.t140PayloadNum = t140MapNum;
+        this.t140RedPayloadNum = t140RedMapNum;
+        recvThread = new ReceiveThread(recvBuf); // this must be created only once t140PayloadNum and t140RedPayloadNum are set
         recvThread.start();
-        printThread.start();
         try {
             session = manager.createRtpSession(localRTPPort, remoteIP, remotePort);
             session.addRtpListener(recvThread);
@@ -240,7 +245,8 @@ public class RTTCall {
         private RtpTextReceiver textReceiver;
 
         public ReceiveThread(FifoBuffer buffer) {
-            textReceiver = new RtpTextReceiver(localPort, false, t140PayloadNum, 0, buffer);
+            // RtpTextReceiver must be created only once t140PayloadNum and t140RedPayloadNum are set
+            textReceiver = new RtpTextReceiver(localPort, (t140RedPayloadNum != 0), t140PayloadNum, t140RedPayloadNum, buffer);
         }
 
         /* synchronizing on the boolean stop is probably not necessary */
