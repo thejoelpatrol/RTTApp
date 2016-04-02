@@ -151,9 +151,9 @@ public class RTTCall {
      * @param remotePort the port of the remote party for the RTP stream
      * @param localRTPPort the local port to be used for the RTP stream
      * @param t140MapNum the RTP payload map number corresponding to t140 in the agreed session description
-     * @param t140RedMapNum must be 0 if not using redundancy! This is he RTP payload map number corresponding to
+     * @param t140RedMapNum must be <= 0 if not using redundancy! This is the RTP payload map number corresponding to
      *                      "red", the redundant media type, in the agreed session description
-     * @throws IllegalStateException if no call is currently ringing, or if setT140MapNum() has not yet been called
+     * @throws IllegalStateException if no call is currently ringing
      */
     public void accept(String remoteIP, int remotePort, int localRTPPort, int t140MapNum, int t140RedMapNum) throws IllegalStateException {
         if (!ringing)
@@ -246,7 +246,7 @@ public class RTTCall {
 
         public ReceiveThread(FifoBuffer buffer) {
             // RtpTextReceiver must be created only once t140PayloadNum and t140RedPayloadNum are set
-            textReceiver = new RtpTextReceiver(localPort, (t140RedPayloadNum != 0), t140PayloadNum, t140RedPayloadNum, buffer);
+            textReceiver = new RtpTextReceiver(localPort, (t140RedPayloadNum > 0), t140PayloadNum, t140RedPayloadNum, buffer);
         }
 
         /* synchronizing on the boolean stop is probably not necessary */

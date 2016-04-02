@@ -461,6 +461,12 @@ public class SipClient implements SipListener {
 
     }
 
+    /**
+     *
+     * @param t140MapNum the preferred map number for the red media type, or 0 for no preference
+     * @param redMapNum the preferred map number for the red media type, or 0 for no preference, or -1 for no redundancy
+     * @return
+     */
     private String createSDPContent(int t140MapNum, int redMapNum) {
         int sessionID = Math.abs(randomGen.nextInt());
         if (t140MapNum == 0)
@@ -471,11 +477,13 @@ public class SipClient implements SipListener {
             int codecs[] = {t140MapNum, redMapNum};
             MediaDescription textMedia = SDPFactory.createMediaDescription("text", port+1, 1, "RTP/AVP", codecs);
             textMedia.setAttribute("rtpmap", t140MapNum + " t140/" + SAMPLE_RATE);
-            AttributeField redAttr = new AttributeField();
-            redAttr.setName("rtpmap");
-            redAttr.setValue(redMapNum + " red/" + SAMPLE_RATE);
-            textMedia.addAttribute(redAttr);
-            textMedia.setAttribute("fmtp", redMapNum + " " + t140MapNum + "/" + t140MapNum + "/" + t140MapNum + "/" + t140MapNum); // 4 levels of red
+            if (redMapNum > 0) {
+                AttributeField redAttr = new AttributeField();
+                redAttr.setName("rtpmap");
+                redAttr.setValue(redMapNum + " red/" + SAMPLE_RATE);
+                textMedia.addAttribute(redAttr);
+                textMedia.setAttribute("fmtp", redMapNum + " " + t140MapNum + "/" + t140MapNum + "/" + t140MapNum + "/" + t140MapNum); // 4 levels of red
+            }
             AttributeField sendrecv = new AttributeField();
             sendrecv.setName("sendrecv");
             sendrecv.setValueAllowNull(null);
@@ -633,6 +641,7 @@ public class SipClient implements SipListener {
     /* I'll be mad if it turns out there is a way to do this automatically with the
     SDP library, but as far as I can tell, all it does is structure the string into
     discrete lines of different types
+        returns: the t140 payload map number from the incoming SDP, or -1 if none
      */
     private int getT140MapNum(Message incomingRequestResponse, mediaType mediaType) {
         String body = new String(incomingRequestResponse.getRawContent(), StandardCharsets.UTF_8);
@@ -652,17 +661,13 @@ public class SipClient implements SipListener {
                             String mapNum = attrValue.split(" ")[0];
                             return Integer.decode(mapNum);
                         }
-                        /*if (attrName.equals("rtpmap") && attrValue.contains("t140") && !attrValue.contains("red")) {
-                            String mapNum = attrValue.split(" ")[0];
-                            return Integer.decode(mapNum);
-                        }*/
                     }
                 }
             }
-            return 0;
+            return -1;
         } catch (Exception e) {
             e.printStackTrace();
-            return 0;
+            return -1;
         }
     }
 
