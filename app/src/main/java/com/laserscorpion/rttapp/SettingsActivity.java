@@ -20,8 +20,8 @@ public class SettingsActivity extends AppCompatActivity {
         setSupportActionBar(toolbar);
 
         if (savedInstanceState == null) {
-            getFragmentManager().beginTransaction().replace(android.R.id.content,
-                    new SettingsActivityFragment()).commit();
+           /* getFragmentManager().beginTransaction().replace(android.R.id.content,
+                    new SettingsActivityFragment()).commit(); */
         }
     }
 

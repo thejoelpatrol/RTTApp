@@ -7,7 +7,7 @@
     android:paddingRight="@dimen/activity_horizontal_margin"
     android:paddingTop="48dp"
     tools:context="com.laserscorpion.rttapp.SettingsActivityFragment"
-    tools:showIn="@layout/activity_settings">
+    tools:showIn="@layout/content_settings">
 
     <ListView
         android:layout_width="match_parent"
