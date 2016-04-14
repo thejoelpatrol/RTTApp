@@ -13,12 +13,14 @@ import android.view.View;
 import android.widget.EditText;
 import android.widget.TextView;
 
+import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 
 
 public class RTTCallActivity extends AppCompatActivity implements TextListener, SessionListener, TextWatcher {
     public static final String TAG = "RTTCallActivity";
     private SipClient texter;
+    private CharSequence currentText;
     //private String contact_URI;
 
     @Override
@@ -116,7 +118,42 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
     @Override
     public void onTextChanged(CharSequence s, int start, int before, int count) {
         Log.d(TAG, "text changed! start: " + start + " | before: " + before + " | count: " + count);
-        texter.sendRTTChars("a");
+
+        synchronized (this) {
+            CharSequence changedChars = s.subSequence(start, start + count);
+
+            if (count > before) {
+                if (charsOnlyAppended(changedChars, start, before)) {
+                    CharSequence added = s.subSequence(start + before, s.length());
+                    texter.sendRTTChars(added.toString());
+                }
+
+            } else {
+                if (charsOnlyDeleted()) {
+                    byte[] del = new byte[1];
+                    del[0] = (byte)0x08;
+                    texter.sendRTTChars(new String(del, StandardCharsets.UTF_8));
+                }
+            }
+            //texter.sendRTTChars("a");
+            currentText = s;
+        }
+    }
+
+    private boolean charsOnlyAppended(CharSequence added, int start, int before) {
+        if (currentText == null)
+            return true;
+        if (before == 0)
+            return true;
+        CharSequence origSeq = currentText.subSequence(start, start + before);
+        CharSequence currentSeq = added.subSequence(0, before);
+        if (origSeq.equals(currentSeq))
+            return true;
+        return false;
+    }
+
+    private boolean charsOnlyDeleted() {
+        return true;
     }
 
     @Override

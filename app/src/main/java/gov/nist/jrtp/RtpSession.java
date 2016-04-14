@@ -282,7 +282,7 @@ public class RtpSession {
 
 		}
 		
-		System.out.println("---------------\n[RtpSession] RTP Data:");
+		/*System.out.println("---------------\n[RtpSession] RTP Data:");
 		System.out.println("[RtpSession] Sending V: " + rtpPacket.getV());
 		System.out.println("[RtpSession] Sending P: " + rtpPacket.getP());
 		System.out.println("[RtpSession] Sending X: " + rtpPacket.getX());
@@ -292,7 +292,7 @@ public class RtpSession {
 		System.out.println("[RtpSession] Sending SN: " + rtpPacket.getSN());
 		System.out.println("[RtpSession] Sending TS: " + rtpPacket.getTS());
 		System.out.println("[RtpSession] Sending SSRC: " + rtpPacket.getSSRC());
-		System.out.println("[RtpSession] Sending Payload size: " + rtpPacket.getPayloadLength());
+		System.out.println("[RtpSession] Sending Payload size: " + rtpPacket.getPayloadLength());*/
 		
 
 		DatagramPacket outgoingDatagramPacket = new DatagramPacket(new byte[1],
