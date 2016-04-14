@@ -11,7 +11,9 @@ import org.w3c.dom.Text;
 import java.io.IOException;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.Semaphore;
 
@@ -26,7 +28,9 @@ import gov.nist.jrtp.RtpStatusEvent;
 import gov.nist.jrtp.RtpTimeoutEvent;
 
 import se.omnitor.protocol.rtp.RtpTextReceiver;
+import se.omnitor.protocol.rtp.RtpTextTransmitter;
 import se.omnitor.protocol.rtp.packets.RTPPacket;
+import se.omnitor.protocol.rtp.text.SyncBuffer;
 import se.omnitor.util.*;
 
 
@@ -35,6 +39,8 @@ import se.omnitor.util.*;
  */
 public class RTTCall {
     private static final String TAG = "RTTCall";
+    private static final int RFC4103_BUFFER_TIME = 300;
+    private static final int REDUNDANT_TEXT_GENERATIONS = 3;
     private SipClient sipClient;
     private Dialog dialog;
     private Request creationRequest;
@@ -57,7 +63,9 @@ public class RTTCall {
     private RtpManager manager;
     private RtpSession session;
     private FifoBuffer recvBuf;
+    private SyncBuffer outgoingBuf;
     private ReceiveThread recvThread;
+    private SendThread sendThread;
     private TextPrintThread printThread;
     private int t140PayloadNum;
     private int t140RedPayloadNum;
@@ -167,9 +175,11 @@ public class RTTCall {
      * @param remotePort the port of the remote party for the RTP stream
      * @param localRTPPort the local port to be used for the RTP stream
      * @param t140MapNum the RTP payload map number corresponding to t140 in the agreed session description
+     * @param t140RedMapNum must be <= 0 if not using redundancy! This is the RTP payload map number corresponding to
+     *                      "red", the redundant media type, in the agreed session description
      * @throws IllegalStateException if no call is currently outgoing
      */
-    public void callAccepted(String remoteIP, int remotePort, int localRTPPort, int t140MapNum) {
+    public void callAccepted(String remoteIP, int remotePort, int localRTPPort, int t140MapNum, int t140RedMapNum) {
         if (!calling)
             throw new IllegalStateException("not calling anyone - what was accepted?");
         connectCall(remoteIP, remotePort, localRTPPort, t140MapNum, 0);
@@ -187,19 +197,38 @@ public class RTTCall {
         this.t140RedPayloadNum = t140RedMapNum;
         recvThread = new ReceiveThread(recvBuf); // this must be created only once t140PayloadNum and t140RedPayloadNum are set
         recvThread.start();
+        boolean useRed = (t140RedMapNum > 0);
+        int redGenerations = useRed  ? REDUNDANT_TEXT_GENERATIONS : 0;
+        outgoingBuf = new SyncBuffer(redGenerations, RFC4103_BUFFER_TIME);
+        outgoingBuf.start();
         try {
             session = manager.createRtpSession(localRTPPort, remoteIP, remotePort);
             session.addRtpListener(recvThread);
             session.receiveRTPPackets();
+            int payloadType = useRed ? t140RedMapNum : t140MapNum;
+            //sendThread = new SendThread(session, payloadType);
+            RtpTextTransmitter transmitter = new RtpTextTransmitter(session, true, t140MapNum, useRed,
+                                                    t140RedMapNum, redGenerations, outgoingBuf, false);
+            transmitter.start();
         } catch (IOException e) {
             e.printStackTrace();
+            end();
         } catch (RtpException e) {
             e.printStackTrace();
+            end();
         }
         connected = true;
         ringing = false;
         calling = false;
     }
+
+    public void sendText(String text) {
+        if (!connected)
+            throw new IllegalStateException("call is not connected, no one to send text to");
+        byte[] t140Text = text.getBytes(StandardCharsets.UTF_8);
+        outgoingBuf.setData(t140Text);
+    }
+
 
     /**
      * End a call at any stage. Invoking multiple times has no effect; the
@@ -214,6 +243,8 @@ public class RTTCall {
                 printThread.stopPrinting();
             if (recvThread != null)
                 recvThread.stopReceiving();
+            if (sendThread != null)
+                sendThread.stopSending();
             if (session != null) {
                 session.stopRtpPacketReceiver();
                 session.shutDown();
@@ -302,6 +333,7 @@ public class RTTCall {
             Log.e(TAG, "!!! RTP ERROR!!");
         }
     }
+
 
     /**
      * This thread is constantly waiting for ReceiveThread to add

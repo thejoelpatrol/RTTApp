@@ -18,7 +18,15 @@
  */
 package se.omnitor.protocol.rtp;
 
+import android.util.Log;
+
+import java.io.IOException;
+import java.security.SecureRandom;
 import java.util.Random;
+
+import gov.nist.jrtp.RtpException;
+import gov.nist.jrtp.RtpPacket;
+import gov.nist.jrtp.RtpSession;
 import se.omnitor.protocol.rtp.Session;
 import se.omnitor.protocol.rtp.StateThread;
 import se.omnitor.protocol.rtp.packets.RTPPacket;
@@ -28,6 +36,7 @@ import se.omnitor.protocol.rtp.text.SyncBuffer;
 import se.omnitor.protocol.rtp.text.TextConstants;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import com.laserscorpion.rttapp.SendThread;
 
 /**
  * An RTP text transmitter that reads characters from a buffer and sends them
@@ -39,13 +48,15 @@ import java.util.logging.Logger;
 public class RtpTextTransmitter implements Runnable {
 
 	private StateThread thisThread = null;
-	private Session rtpSession;
+	//private SendThread sender;
+	private RtpSession session;
 	private RtpTextPacketizer textPacketizer;
 
 	private String ipAddress;
 	private int localPort;
 	private int remotePort;
 	private boolean redFlagOutgoing;
+	private int payloadType;
 
 	private boolean isEconf351Client = false;
 
@@ -78,35 +89,26 @@ public class RtpTextTransmitter implements Runnable {
 	 * @param redPayloadType The RTP payload type number to use for RED
 	 * @param redundantGenerations The number of redundant generations to use,
 	 * if redundancy should be used.
-	 * @param redT140FlagOutgoing Whether T.140 redundancy should be used.
 	 * @param redundantT140Generations The number of redundant T.140
 	 * generations to use.
 	 * @param dataBuffer The buffer with incoming data. This has to be started
 	 * before transmission begins.
 	 */
-	public RtpTextTransmitter(Session rtpSession,
+	public RtpTextTransmitter(RtpSession session,
 			boolean startRtpTransmit,
-			String ipAddress,
-			int localPort,
-			int remotePort,
 			int t140PayloadType,
 			boolean redFlagOutgoing,
 			int redPayloadType,
-			int redundantGenerations,
-			boolean redT140FlagOutgoing,
 			int redundantT140Generations,
 			SyncBuffer dataBuffer, boolean econf351Client) {
 
 		// write methodname
 		final String METHOD = "RtpTextTransmitter(Session rtpSession, ...)";
 		// log when entering a method
-		logger.entering(CLASS_NAME, METHOD, new Object[]{ipAddress, "'" + localPort + "'" , "'" + remotePort + "'"});
+		//logger.entering(CLASS_NAME, METHOD, new Object[]{ipAddress, "'" + localPort + "'" , "'" + remotePort + "'"});
 
-
-		this.rtpSession = rtpSession;// new Session(ipAddress, 64000);
-		this.ipAddress = ipAddress;
-		this.localPort = localPort;
-		this.remotePort = remotePort;
+		//this.sender = sender;
+		this.session = session;
 		this.redFlagOutgoing = redFlagOutgoing;
 		this.redundantT140Generations = redundantT140Generations;
 		this.dataBuffer = dataBuffer;
@@ -114,10 +116,12 @@ public class RtpTextTransmitter implements Runnable {
 
 		// using redundancy
 		if (redFlagOutgoing) {
-			dataBuffer.setRedGen(redundantGenerations);
+			dataBuffer.setRedGen(redundantT140Generations);
+			payloadType = redPayloadType;
 		}
 		else {
 			dataBuffer.setRedGen(0);
+			payloadType = t140PayloadType;
 		}
 
 		// EZ: T140 redundancy init
@@ -148,14 +152,14 @@ public class RtpTextTransmitter implements Runnable {
 
 		textPacketizer = new RtpTextPacketizer(t140PayloadType,
 				redPayloadType,
-				redundantGenerations);
+				redundantT140Generations);
 
-		if (redFlagOutgoing) {
+		/*if (redFlagOutgoing) {
 			rtpSession.setSendPayloadType(redPayloadType);
 		}
 		else {
 			rtpSession.setSendPayloadType(t140PayloadType);
-		}
+		}*/
 
 		// Changed by Andreas Piirimets 2004-02-16
 		// The transmission should be able to handle a localPort which is
@@ -178,10 +182,16 @@ public class RtpTextTransmitter implements Runnable {
 	/**
 	 * Creates an SSRC for this session.
 	 *
+	 * Joel says: LOL @ Omnitor trying to create a seed
+	 * for their random generator. Oh, this might have been written
+	 * before Java 1.5. OK...
+	 *
 	 * @return The SSRC
 	 */
 	private long createSSRC() {
-
+		SecureRandom randomGen = new SecureRandom();
+		return randomGen.nextLong();
+		/*
 		//Creata a seed to ensure the SSRC is as random as possible,
 		long time  = java.lang.System.currentTimeMillis();
 		long ports = (long)remotePort << 32 | localPort;
@@ -225,7 +235,7 @@ public class RtpTextTransmitter implements Runnable {
 
 		//Use the seed to get the SSRC.
 		Random rand = new Random(seed);
-		return rand.nextLong();
+		return rand.nextLong();*/
 	}
 
 	/**
@@ -323,7 +333,14 @@ public class RtpTextTransmitter implements Runnable {
 					outputPacket.setMarker(outBuffer.getMarker());
 					outputPacket.setSsrc(ssrc);
 
-					rtpSession.sendRTPPacket(outputPacket);
+					RtpPacket convertedPacket = convertPacket(outputPacket);
+
+					try {
+						session.sendRtpPacket(convertedPacket);
+					} catch (Exception e) {
+						Log.e("RtpTextTransmitter", "Packet not sent, probably lost");
+						e.printStackTrace();
+					}
 				}
 
 			}
@@ -336,6 +353,22 @@ public class RtpTextTransmitter implements Runnable {
 		thisThread = null;
 
 		logger.exiting(CLASS_NAME, METHOD);
+	}
+
+	private RtpPacket convertPacket(RTPPacket packet) {
+		RtpPacket converted = new RtpPacket();
+		byte[] t140Data = packet.getPayloadData();
+
+		converted.setCC((int) packet.getCsrcCount());
+		converted.setM(packet.getMarker());
+		converted.setSSRC(0xFFFFFFFFL & packet.getSsrc());
+		converted.setTS(0xFFFFFFFFL & packet.getTimeStamp()); // mask off high order 4 bytes, which Omnitor normally does later
+		converted.setSN((int)packet.getSequenceNumber());
+		converted.setPT(payloadType);
+		converted.setPayload(t140Data, t140Data.length);
+		converted.setV(2);
+
+		return converted;
 	}
 
 	/**
@@ -375,13 +408,13 @@ public class RtpTextTransmitter implements Runnable {
 			thisThread.setState(StateThread.STOP);
 			thisThread.interrupt();
 		}
-		if (rtpSession != null) {
+		/*if (rtpSession != null) {
 			// logger.finest("Stopping RTP and RTCP sessions.");
 			rtpSession.stopRTCPSenderThread();
 			rtpSession.stopRTPThread();
 			rtpSession = null;
 			//logger.finest("RTP session stopped.");
-		}
+		}*/
 	}
 
 	/**
@@ -389,18 +422,18 @@ public class RtpTextTransmitter implements Runnable {
 	 *
 	 * @param name The CName
 	 */
-	public void setCName(String name) {
+	/*public void setCName(String name) {
 		rtpSession.setCName(name);
-	}
+	}*/
 
 	/**
 	 * Sets the email address, which will be used in the RTP stream
 	 *
 	 * @param email The email address
 	 */
-	public void setEmail(String email) {
+	/*public void setEmail(String email) {
 		rtpSession.setEmail(email);
-	}
+	}*/
 
 	public int dropOneRtpTextSeqNo() {
 		if (textPacketizer != null) {

@@ -76,6 +76,7 @@ public class RtpTextDePacketizer {
 
     private int t140PayloadType;
     private byte signedT140PayloadType;
+    private int redPayloadType;
 
     private Timer timer = null;
 
@@ -99,6 +100,7 @@ public class RtpTextDePacketizer {
 
         this.t140PayloadType = t140PayloadType;
         this.redFlagIncoming = redFlagIncoming;
+        this.redPayloadType = redPt;
 
         timer = new Timer();
 

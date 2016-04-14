@@ -301,10 +301,14 @@ public class SipClient implements SipListener {
         }
     }
 
-    private void sendRTTChars(String add) {
-        for (TextListener listener : messageReceivers) {
+    public void sendRTTChars(String add) throws IllegalStateException {
+        if (!onACallNow())
+            throw new IllegalStateException("no call connected, cannot send chars");
+        currentCall.sendText(add);
+        /*for (TextListener listener : messageReceivers) {
             listener.RTTextReceived(add);
-        }
+        }*/
+
     }
 
     private void notifySessionFailed(String reason) {
@@ -959,7 +963,8 @@ public class SipClient implements SipListener {
         if (sessionIsAcceptable(response)) {
             Log.d(TAG, "acceptable!");
             int agreedT140MapNum = getT140MapNum(response, mediaType.T140);
-            currentCall.callAccepted(getContactIP(response), getT140PortNum(response), port+1, agreedT140MapNum);
+            int agreedT140RedMapNum = getT140MapNum(response, mediaType.T140RED);
+            currentCall.callAccepted(getContactIP(response), getT140PortNum(response), port+1, agreedT140MapNum, agreedT140RedMapNum);
         } else {
             Log.d(TAG, "not acceptable");
             sendBye(dialog);

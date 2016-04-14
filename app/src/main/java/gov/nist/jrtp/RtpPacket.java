@@ -464,7 +464,7 @@ public class RtpPacket implements Serializable {
 	 *            The sequence number (16 bits)
 	 * @throws IllegalArgumentException
 	 */
-	protected void setSN(int i) throws IllegalArgumentException {
+	public void setSN(int i) throws IllegalArgumentException {
 
 		if ((0 <= i) && (i <= ByteUtil.getMaxIntValueForNumBits(16)))
 			SN = i;
@@ -496,7 +496,7 @@ public class RtpPacket implements Serializable {
 		if ((0 <= timeStamp) && (timeStamp <= ByteUtil.getMaxLongValueForNumBits(32)))
 			TS = timeStamp;
 		else
-			throw new IllegalArgumentException(RtpException.OUT_OF_RANGE);
+			throw new IllegalArgumentException(RtpException.OUT_OF_RANGE + " " + timeStamp);
 
 	}
 

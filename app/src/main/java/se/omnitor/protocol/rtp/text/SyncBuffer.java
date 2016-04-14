@@ -132,6 +132,7 @@ public class SyncBuffer extends FifoBuffer implements Runnable {
 	 * @todo Backspace handling - If a backspace is in the middle of the
 	 * buffer, remove characters from buffer instead of sending backspace.
 	 */
+	// TODO yes Joel do this!
 	public synchronized void setData(byte[] newData) {
 		synchronized (dataSetSemaphore) {
 			byte[] temp = null;
