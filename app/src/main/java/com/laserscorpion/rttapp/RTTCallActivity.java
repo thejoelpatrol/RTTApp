@@ -19,6 +19,7 @@ import java.text.ParseException;
 
 public class RTTCallActivity extends AppCompatActivity implements TextListener, SessionListener, TextWatcher {
     public static final String TAG = "RTTCallActivity";
+    private static final String STATE = "currentText";
     private SipClient texter;
     private CharSequence currentText;
     //private String contact_URI;
@@ -38,6 +39,11 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
         texter = SipClient.getInstance();
         texter.addTextReceiver(this);
         texter.addSessionListener(this);
+
+        if (savedInstanceState != null) {
+            CharSequence oldText = savedInstanceState.getCharSequence(STATE);
+            currentText = oldText;
+        }
         //contact_URI = getIntent().getStringExtra("com.laserscorpion.rttapp.contact_uri");
     }
 
@@ -59,6 +65,11 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
         texter.removeSessionListener(this);
     }
 
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        outState.putCharSequence(STATE, currentText);
+        super.onSaveInstanceState(outState);
+    }
 
     private synchronized void addText(final String text) {
         final TextView view = (TextView)findViewById(R.id.textview);
