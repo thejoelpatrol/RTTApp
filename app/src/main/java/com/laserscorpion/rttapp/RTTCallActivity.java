@@ -15,6 +15,7 @@ import android.widget.TextView;
 
 import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
+import java.util.Arrays;
 
 
 public class RTTCallActivity extends AppCompatActivity implements TextListener, SessionListener, TextWatcher {
@@ -122,8 +123,9 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
     }
 
     @Override
-    public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-
+    public synchronized void beforeTextChanged(CharSequence s, int start, int count, int after) {
+        if (s.length() > 0)
+            currentText = s.subSequence(0, s.length());
     }
 
     @Override
@@ -131,39 +133,78 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
         Log.d(TAG, "text changed! start: " + start + " | before: " + before + " | count: " + count);
 
         synchronized (this) {
-            CharSequence changedChars = s.subSequence(start, start + count);
+            //CharSequence changedChars = s.subSequence(start, start + count);
 
             if (count > before) {
-                if (charsOnlyAppended(changedChars, start, before)) {
+                if (charsOnlyAppended(s, start, before, count)) {
                     CharSequence added = s.subSequence(start + before, s.length());
                     texter.sendRTTChars(added.toString());
+                } else {
+                    Log.d(TAG, "Some kind of complex edit occurred 1");
                 }
 
-            } else {
-                if (charsOnlyDeleted()) {
+            } else if (count < before) {
+                if (charsOnlyDeleted(s, start, before, count)) {
                     byte[] del = new byte[1];
                     del[0] = (byte)0x08;
                     texter.sendRTTChars(new String(del, StandardCharsets.UTF_8));
+                } else {
+                    Log.d(TAG, "Some kind of complex edit occurred 2");
+                }
+            } else {
+                if (textActuallyChanged(s, start, before, count)) {
+                    Log.d(TAG, "Some kind of complex edit occurred 3");
+                } else {
+                    Log.d(TAG, "text did not actually change");
+                    return;
                 }
             }
             //texter.sendRTTChars("a");
-            currentText = s;
+            //currentText = s;
         }
     }
 
-    private boolean charsOnlyAppended(CharSequence added, int start, int before) {
+    private void sendBackspaces(int howMany) {
+        byte[] del = new byte[howMany];
+        Arrays.fill(del, (byte) 0x08);
+        texter.sendRTTChars(new String(del, StandardCharsets.UTF_8));
+    }
+
+    private boolean charsOnlyAppended(CharSequence now, int start, int before, int count) {
         if (currentText == null)
             return true;
         if (before == 0)
             return true;
+        if (start + before != currentText.length())
+            return false; // some text was changed that was not the LAST part of the string
+
         CharSequence origSeq = currentText.subSequence(start, start + before);
-        CharSequence currentSeq = added.subSequence(0, before);
-        if (origSeq.equals(currentSeq))
+        CharSequence newSeq = now.subSequence(start, start + before);
+        String origString = origSeq.toString();
+        String newString = newSeq.toString();
+        if (origString.equals(newString))
             return true;
         return false;
     }
 
-    private boolean charsOnlyDeleted() {
+    private boolean charsOnlyDeleted(CharSequence s, int start, int before, int count) {
+
+        return true;
+    }
+
+    /**
+     * Precondition: before == count
+     *
+     * for some reason, when spaces are added, the previous word is reported as changing, but it doesn't really,
+     * so we are checking that here
+     */
+    private boolean textActuallyChanged(CharSequence now, int start, int before, int count) {
+        if (currentText == null)
+            return true;
+        String changed = now.subSequence(start, start + count).toString();
+        String origStr = currentText.toString();
+        if (origStr.regionMatches(start, changed, 0, before))
+            return false;
         return true;
     }
 
