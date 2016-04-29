@@ -47,7 +47,7 @@
             android:maxLines="10"
             android:scrollbars="vertical"
             android:gravity="bottom" />
-        <EditText
+        <!-- EditText
             android:id="@+id/compose_message"
             android:background="@drawable/back"
             android:paddingBottom="4dip"
@@ -60,6 +60,13 @@
             android:layout_weight="1"
             android:maxLines="10"
             android:scrollbars="vertical"
+            android:hint="Your text" /-->
+        <EditText
+            android:id="@+id/compose_message"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/textview"
+            android:layout_weight="1"
             android:hint="Your text"/>
 
 </RelativeLayout>
