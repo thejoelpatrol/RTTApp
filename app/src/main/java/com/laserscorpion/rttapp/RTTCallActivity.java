@@ -145,15 +145,16 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
 
             } else if (count < before) {
                 if (charsOnlyDeleted(s, start, before, count)) {
-                    byte[] del = new byte[1];
-                    del[0] = (byte)0x08;
-                    texter.sendRTTChars(new String(del, StandardCharsets.UTF_8));
+                    sendBackspaces(before - count);
                 } else {
                     Log.d(TAG, "Some kind of complex edit occurred 2");
+                    /*if (textWasReplaced(s, start, before, count)) {
+
+                    }*/
                 }
             } else {
                 if (textActuallyChanged(s, start, before, count)) {
-                    Log.d(TAG, "Some kind of complex edit occurred 3");
+                    sendCompoundReplacementText(s, start, before, count);
                 } else {
                     Log.d(TAG, "text did not actually change");
                     return;
@@ -168,6 +169,15 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
         byte[] del = new byte[howMany];
         Arrays.fill(del, (byte) 0x08);
         texter.sendRTTChars(new String(del, StandardCharsets.UTF_8));
+    }
+
+    /**
+     * Precondition: before == count
+     */
+    private void sendCompoundReplacementText(CharSequence now, int start, int before, int count) {
+        sendBackspaces(count);
+        CharSequence seq = now.subSequence(start, start + count);
+        texter.sendRTTChars(seq.toString());
     }
 
     private boolean charsOnlyAppended(CharSequence now, int start, int before, int count) {
@@ -187,9 +197,17 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
         return false;
     }
 
+    /**
+     * Precondition: before > count
+     */
     private boolean charsOnlyDeleted(CharSequence s, int start, int before, int count) {
-
-        return true;
+        if (count == 0)
+            return true;
+        String origString = currentText.subSequence(start, start + count).toString();
+        String newString = s.subSequence(start, start + count).toString();
+        if (origString.equals(newString))
+            return true;
+        return false;
     }
 
     /**
@@ -207,6 +225,13 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
             return false;
         return true;
     }
+
+    /**
+     * Precondition: before  count
+    */
+    /* private boolean textWasReplaced(CharSequence now, int start, int before, int count) {
+        return false;
+    }*/
 
     @Override
     public void afterTextChanged(Editable s) {
