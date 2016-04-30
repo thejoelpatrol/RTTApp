@@ -2,12 +2,21 @@ bugs
 
 -sometimes registering freezes at a black screen
 	-this doesn't seem to happen any more…?
--sometimes that JAIN SIP asynctask race condition is triggered in responding to OPTIONS 	- but who really cares?
+-sometimes that JAIN SIP asynctask race condition is triggered in responding to OPTIONS 
+	- but who really cares?
 -excess BYEs seem to be sent by the server, but they don’t seem to cause any problems
 -messed up lock handling for setting up new calls
 -need to re-register after expiration
--preferences activity display is messed up
--need to display "from" on incoming call activity
 -probably don't need to wait on get() any more
 -non-printing characters are not received correctly (esp delete!)
 -@todo Backspace handling in sending messages
+-shouldn't allow edits to previous text
+-doze/standby (this is a way future problem)
+
+UI deficiencies
+-so ugly
+-report errors via dialogs
+-log in RegistrationActivity is probably not useful
+-entire RegistrationActivity should be replaced with phone book or recent calls or something
+-need to display "from" on incoming call activity
+-app only works in foreground, in RegistrationActivity. should fire an Intent when it's running in bg

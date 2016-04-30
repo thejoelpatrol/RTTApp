@@ -15,14 +15,23 @@ import android.widget.TextView;
 
 import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
+import java.util.Arrays;
 
 
 public class RTTCallActivity extends AppCompatActivity implements TextListener, SessionListener, TextWatcher {
+    private class Edit {
+        public int start;
+        public int before;
+        public int count;
+    }
+
     public static final String TAG = "RTTCallActivity";
     private static final String STATE = "currentText";
     private SipClient texter;
     private CharSequence currentText;
-    //private String contact_URI;
+    private Edit previousEdit;
+    private boolean makingManualEdit = false;
+    private boolean needManualEdit = false; // flag that indicates that we need to undo the text change the user made - not allowed to edit earlier text
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,7 +53,6 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
             CharSequence oldText = savedInstanceState.getCharSequence(STATE);
             currentText = oldText;
         }
-        //contact_URI = getIntent().getStringExtra("com.laserscorpion.rttapp.contact_uri");
     }
 
     @Override
@@ -60,7 +68,6 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        //texter.hangUp();
         texter.removeTextReceiver(this);
         texter.removeSessionListener(this);
     }
@@ -122,53 +129,157 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
     }
 
     @Override
-    public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-
+    public synchronized void beforeTextChanged(CharSequence s, int start, int count, int after) {
+        if (makingManualEdit)
+            return;
+        if (s.length() > 0)
+            currentText = s.subSequence(0, s.length()); // deep copy the text before it is changed so we can compare before and after the edit
     }
 
+    /**
+     * This is the bulk of the logic to determine which characters to send to the other party when the user enters text
+     */
     @Override
-    public void onTextChanged(CharSequence s, int start, int before, int count) {
-        Log.d(TAG, "text changed! start: " + start + " | before: " + before + " | count: " + count);
+    public synchronized void onTextChanged(CharSequence s, int start, int before, int count) {
+        if (makingManualEdit) {
+            if (BuildConfig.DEBUG) Log.d(TAG, "ignoring manual edit");
+            return;
+        }
+        if (BuildConfig.DEBUG) Log.d(TAG, "text changed! start: " + start + " | before: " + before + " | count: " + count);
 
-        synchronized (this) {
-            CharSequence changedChars = s.subSequence(start, start + count);
-
-            if (count > before) {
-                if (charsOnlyAppended(changedChars, start, before)) {
-                    CharSequence added = s.subSequence(start + before, s.length());
-                    texter.sendRTTChars(added.toString());
+        if (editOverlappedEnd(start, before, count)) {
+            if (charsOnlyAppended(s, start, before, count)) {
+                sendAppendedChars(s, start, before, count);
+            } else if (charsOnlyDeleted(s, start, before, count)) {
+                sendDeletionsFromEnd(s, start, before, count);
+            } else if (count == before) {
+                if (textActuallyChanged(s, start, before, count)) {
+                    // when entering a space, the previous word is reported as changing for some reason, but it hasn't actually changed, so we must check
+                    sendCompoundReplacementText(s, start, before, count);
                 }
-
             } else {
-                if (charsOnlyDeleted()) {
-                    byte[] del = new byte[1];
-                    del[0] = (byte)0x08;
-                    texter.sendRTTChars(new String(del, StandardCharsets.UTF_8));
-                }
+                if (BuildConfig.DEBUG) Log.d(TAG, "Some kind of complex edit occurred 1");
+                needManualEdit = true;
+                // we can't allow edits that occur earlier in the text, you can only edit the end
             }
-            //texter.sendRTTChars("a");
-            currentText = s;
+        } else {
+            if (BuildConfig.DEBUG) Log.d(TAG, "Some kind of complex edit occurred 2");
+            needManualEdit = true;
+            // we can't allow edits that occur earlier in the text, you can only edit the end
+        }
+        previousEdit = new Edit();
+        previousEdit.start = start;
+        previousEdit.before = before;
+        previousEdit.count = count;
+    }
+
+    private void sendBackspaces(int howMany) {
+        byte[] del = new byte[howMany];
+        Arrays.fill(del, (byte) 0x08);
+        texter.sendRTTChars(new String(del, StandardCharsets.UTF_8));
+    }
+
+    /**
+     * Precondition: charsOnlyAppended()
+     */
+    private void sendAppendedChars(CharSequence now, int start, int before, int count) {
+        if (BuildConfig.DEBUG) Log.d(TAG, "chars appended");
+        CharSequence added = now.subSequence(start + before, now.length());
+        texter.sendRTTChars(added.toString());
+    }
+
+    /**
+     * Precondition: charsOnlyDeleted()
+     */
+    private void sendDeletionsFromEnd(CharSequence now, int start, int before, int count) {
+        Log.d(TAG, "chars deleted from end");
+        sendBackspaces(before - count);
+        if (previousEdit != null && previousEdit.start == start && previousEdit.count == 0) {
+            // this is the case where the last word has been deleted in two steps by the keyboard, i.e. the cursor is in the middle of the word and it is replaced
+            sendBackspaces(previousEdit.before);
         }
     }
 
-    private boolean charsOnlyAppended(CharSequence added, int start, int before) {
+    /**
+     * Precondition: before == count
+     */
+    private void sendCompoundReplacementText(CharSequence now, int start, int before, int count) {
+        sendBackspaces(count);
+        CharSequence seq = now.subSequence(start, start + count);
+        texter.sendRTTChars(seq.toString());
+    }
+
+    /**
+     * Check whether the text that changed included the end of the entire text.
+     * If not, we can't allow the edit. You must only add and delete chars
+     * at the end of the text.
+     */
+    private boolean editOverlappedEnd(int start, int before, int count) {
         if (currentText == null)
             return true;
+        return (start + before == currentText.length());
+    }
+
+    /**
+     * Precondition: editOverlappedEnd()
+     */
+    private boolean charsOnlyAppended(CharSequence now, int start, int before, int count) {
         if (before == 0)
             return true;
+        if (before >= count)
+            return false; // if before == count, the last word was changed, but no additional chars appended
+
         CharSequence origSeq = currentText.subSequence(start, start + before);
-        CharSequence currentSeq = added.subSequence(0, before);
-        if (origSeq.equals(currentSeq))
+        CharSequence newSeq = now.subSequence(start, start + before);
+        String origString = origSeq.toString();
+        String newString = newSeq.toString();
+        if (origString.equals(newString))
             return true;
         return false;
     }
 
-    private boolean charsOnlyDeleted() {
+    /**
+     * Precondition: editOverlappedEnd()
+     */
+    private boolean charsOnlyDeleted(CharSequence s, int start, int before, int count) {
+        if (before <= count)
+            return false; // if before == count, the last word was changed, but no net chars deleted
+        if (count == 0)
+            return true;
+        String origString = currentText.subSequence(start, start + count).toString();
+        String newString = s.subSequence(start, start + count).toString();
+        if (origString.equals(newString))
+            return true;
+        return false;
+    }
+
+    /**
+     * Precondition: before == count
+     *
+     * for some reason, when spaces are added, the previous word is reported as changing, but it doesn't really,
+     * so we are checking that here
+     */
+    private boolean textActuallyChanged(CharSequence now, int start, int before, int count) {
+        if (currentText == null)
+            return true;
+        String changed = now.subSequence(start, start + count).toString();
+        String origStr = currentText.toString();
+        if (origStr.regionMatches(start, changed, 0, before))
+            return false;
         return true;
     }
 
     @Override
-    public void afterTextChanged(Editable s) {
+    public synchronized void afterTextChanged(Editable s) {
+        if (needManualEdit) {
+            makingManualEdit = true;
+            needManualEdit = false;
+            s.replace(0, s.length(), currentText);
+            if (BuildConfig.DEBUG) Log.d(TAG, "initiating replacement to undo prohibited edit");
+        }
+        if (makingManualEdit) {
+            makingManualEdit = false;
+        }
 
     }
 }
