@@ -65,7 +65,6 @@ public class RTTCall {
     private FifoBuffer recvBuf;
     private SyncBuffer outgoingBuf;
     private ReceiveThread recvThread;
-    private SendThread sendThread;
     private TextPrintThread printThread;
     private int t140PayloadNum;
     private int t140RedPayloadNum;
@@ -243,8 +242,6 @@ public class RTTCall {
                 printThread.stopPrinting();
             if (recvThread != null)
                 recvThread.stopReceiving();
-            if (sendThread != null)
-                sendThread.stopSending();
             if (session != null) {
                 session.stopRtpPacketReceiver();
                 session.shutDown();
