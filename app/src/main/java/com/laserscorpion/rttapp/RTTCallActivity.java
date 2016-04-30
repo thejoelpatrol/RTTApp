@@ -131,55 +131,29 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
     @Override
     public synchronized void beforeTextChanged(CharSequence s, int start, int count, int after) {
         if (s.length() > 0)
-            currentText = s.subSequence(0, s.length()); // deep copy the text before it is changed so we can compare the new and old versions
+            currentText = s.subSequence(0, s.length()); // deep copy the text before it is changed so we can compare before and after the edit
     }
 
     @Override
     public void onTextChanged(CharSequence s, int start, int before, int count) {
-        Log.d(TAG, "text changed! start: " + start + " | before: " + before + " | count: " + count);
+        if (BuildConfig.DEBUG) Log.d(TAG, "text changed! start: " + start + " | before: " + before + " | count: " + count);
 
         synchronized (this) {
-            //CharSequence changedChars = s.subSequence(start, start + count);
-
-            if (count > before) {
+            if (editOverlappedEnd(start, before, count)) {
                 if (charsOnlyAppended(s, start, before, count)) {
-                    Log.d(TAG, "chars appended");
-                    CharSequence added = s.subSequence(start + before, s.length());
-                    texter.sendRTTChars(added.toString());
-                } else {
-                    if (editOverlappedEnd(start, before, count)) {
-                        Log.d(TAG, "edit overlapped end");
-                        sendBackspaces(before);
-                        CharSequence added = s.subSequence(start, s.length());
-                        texter.sendRTTChars(added.toString());
-                    } else {
-                        Log.d(TAG, "Some kind of complex edit occurred 1");
-                    }
-                }
-            } else if (count < before) {
-                if (charsOnlyDeleted(s, start, before, count)) {
-                    Log.d(TAG, "chars deleted from end");
-                    sendBackspaces(before - count);
-                    if (previousEdit != null && previousEdit.start == start && previousEdit.count == 0) {
-                        // this is the case where the last word has been deleted in two steps by the keyboard, i.e. the cursor is in the middle of the word and it is replaced
-                        sendBackspaces(previousEdit.before);
-                    }
-                } else {
-                    Log.d(TAG, "Some kind of complex edit occurred 2");
-                }
-            } else {
-                // we know before == count
-                if (editOverlappedEnd(start, before, count)) {
+                    sendAppendedChars(s, start, before, count);
+                } else if (charsOnlyDeleted(s, start, before, count)) {
+                    sendDeletionsFromEnd(s, start, before, count);
+                } else if (count == before) {
                     if (textActuallyChanged(s, start, before, count)) {
                         // when entering a space, the previous word is reported as changing for some reason, but it hasn't actually changed, so we must check
                         sendCompoundReplacementText(s, start, before, count);
-                    } else {
-                        Log.d(TAG, "text did not actually change");
-                        //return;
                     }
                 } else {
-                    Log.d(TAG, "Some kind of complex edit occurred 3");
+                    if (BuildConfig.DEBUG) Log.d(TAG, "Some kind of complex edit occurred 1");
                 }
+            } else {
+                if (BuildConfig.DEBUG) Log.d(TAG, "Some kind of complex edit occurred 2");
             }
             previousEdit = new Edit();
             previousEdit.start = start;
@@ -195,6 +169,27 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
     }
 
     /**
+     * Precondition: charsOnlyAppended()
+     */
+    private void sendAppendedChars(CharSequence now, int start, int before, int count) {
+        if (BuildConfig.DEBUG) Log.d(TAG, "chars appended");
+        CharSequence added = now.subSequence(start + before, now.length());
+        texter.sendRTTChars(added.toString());
+    }
+
+    /**
+     * Precondition: charsOnlyDeleted()
+     */
+    private void sendDeletionsFromEnd(CharSequence now, int start, int before, int count) {
+        Log.d(TAG, "chars deleted from end");
+        sendBackspaces(before - count);
+        if (previousEdit != null && previousEdit.start == start && previousEdit.count == 0) {
+            // this is the case where the last word has been deleted in two steps by the keyboard, i.e. the cursor is in the middle of the word and it is replaced
+            sendBackspaces(previousEdit.before);
+        }
+    }
+
+    /**
      * Precondition: before == count
      */
     private void sendCompoundReplacementText(CharSequence now, int start, int before, int count) {
@@ -203,23 +198,22 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
         texter.sendRTTChars(seq.toString());
     }
 
-    private boolean editOverlappedEnd(int start, int before, int count) {
-        if (count < before)
-            return false;
-        if (start + before == currentText.length())
-            return true;
-        return false;
-    }
 
-    private boolean charsOnlyAppended(CharSequence now, int start, int before, int count) {
+    private boolean editOverlappedEnd(int start, int before, int count) {
+        // basically we are checking whether the text that changed included the end of the entire text
         if (currentText == null)
             return true;
-        if (!editOverlappedEnd(start, before, count))
-            return false; // some text was changed that was not the LAST part of the string
+        return (start + before == currentText.length());
+    }
+
+    /**
+     * Precondition: editOverlappedEnd()
+     */
+    private boolean charsOnlyAppended(CharSequence now, int start, int before, int count) {
         if (before == 0)
             return true;
-        if (before == count)
-            return false; // the last word was changed, but no additional chars appended
+        if (before >= count)
+            return false; // if before == count, the last word was changed, but no additional chars appended
 
         CharSequence origSeq = currentText.subSequence(start, start + before);
         CharSequence newSeq = now.subSequence(start, start + before);
@@ -231,11 +225,11 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
     }
 
     /**
-     * Precondition: before > count
+     * Precondition: editOverlappedEnd()
      */
     private boolean charsOnlyDeleted(CharSequence s, int start, int before, int count) {
-        if (start + before != currentText.length())
-            return false;
+        if (before <= count)
+            return false; // if before == count, the last word was changed, but no net chars deleted
         if (count == 0)
             return true;
         String origString = currentText.subSequence(start, start + count).toString();
