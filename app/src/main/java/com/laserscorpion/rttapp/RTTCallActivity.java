@@ -53,7 +53,6 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
             CharSequence oldText = savedInstanceState.getCharSequence(STATE);
             currentText = oldText;
         }
-        //contact_URI = getIntent().getStringExtra("com.laserscorpion.rttapp.contact_uri");
     }
 
     @Override
@@ -69,7 +68,6 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        //texter.hangUp();
         texter.removeTextReceiver(this);
         texter.removeSessionListener(this);
     }
@@ -138,6 +136,9 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
             currentText = s.subSequence(0, s.length()); // deep copy the text before it is changed so we can compare before and after the edit
     }
 
+    /**
+     * This is the bulk of the logic to determine which characters to send to the other party when the user enters text
+     */
     @Override
     public synchronized void onTextChanged(CharSequence s, int start, int before, int count) {
         if (makingManualEdit) {
@@ -159,10 +160,12 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
             } else {
                 if (BuildConfig.DEBUG) Log.d(TAG, "Some kind of complex edit occurred 1");
                 needManualEdit = true;
+                // we can't allow edits that occur earlier in the text, you can only edit the end
             }
         } else {
             if (BuildConfig.DEBUG) Log.d(TAG, "Some kind of complex edit occurred 2");
             needManualEdit = true;
+            // we can't allow edits that occur earlier in the text, you can only edit the end
         }
         previousEdit = new Edit();
         previousEdit.start = start;
@@ -206,9 +209,12 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
         texter.sendRTTChars(seq.toString());
     }
 
-
+    /**
+     * Check whether the text that changed included the end of the entire text.
+     * If not, we can't allow the edit. You must only add and delete chars
+     * at the end of the text.
+     */
     private boolean editOverlappedEnd(int start, int before, int count) {
-        // basically we are checking whether the text that changed included the end of the entire text
         if (currentText == null)
             return true;
         return (start + before == currentText.length());
@@ -263,13 +269,6 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
         return true;
     }
 
-    /**
-     * Precondition: before  count
-    */
-    /* private boolean textWasReplaced(CharSequence now, int start, int before, int count) {
-        return false;
-    }*/
-
     @Override
     public synchronized void afterTextChanged(Editable s) {
         if (needManualEdit) {
@@ -279,7 +278,6 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
             if (BuildConfig.DEBUG) Log.d(TAG, "initiating replacement to undo prohibited edit");
         }
         if (makingManualEdit) {
-            //if (BuildConfig.DEBUG) Log.d(TAG, "ignoring manual edit");
             makingManualEdit = false;
         }
 
