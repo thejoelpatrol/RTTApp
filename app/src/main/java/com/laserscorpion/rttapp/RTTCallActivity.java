@@ -30,6 +30,8 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
     private SipClient texter;
     private CharSequence currentText;
     private Edit previousEdit;
+    private boolean makingManualEdit = false;
+    private boolean needManualEdit = false; // flag that indicates that we need to undo the text change the user made - not allowed to edit earlier text
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -130,36 +132,42 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
 
     @Override
     public synchronized void beforeTextChanged(CharSequence s, int start, int count, int after) {
+        if (makingManualEdit)
+            return;
         if (s.length() > 0)
             currentText = s.subSequence(0, s.length()); // deep copy the text before it is changed so we can compare before and after the edit
     }
 
     @Override
-    public void onTextChanged(CharSequence s, int start, int before, int count) {
+    public synchronized void onTextChanged(CharSequence s, int start, int before, int count) {
+        if (makingManualEdit) {
+            if (BuildConfig.DEBUG) Log.d(TAG, "ignoring manual edit");
+            return;
+        }
         if (BuildConfig.DEBUG) Log.d(TAG, "text changed! start: " + start + " | before: " + before + " | count: " + count);
 
-        synchronized (this) {
-            if (editOverlappedEnd(start, before, count)) {
-                if (charsOnlyAppended(s, start, before, count)) {
-                    sendAppendedChars(s, start, before, count);
-                } else if (charsOnlyDeleted(s, start, before, count)) {
-                    sendDeletionsFromEnd(s, start, before, count);
-                } else if (count == before) {
-                    if (textActuallyChanged(s, start, before, count)) {
-                        // when entering a space, the previous word is reported as changing for some reason, but it hasn't actually changed, so we must check
-                        sendCompoundReplacementText(s, start, before, count);
-                    }
-                } else {
-                    if (BuildConfig.DEBUG) Log.d(TAG, "Some kind of complex edit occurred 1");
+        if (editOverlappedEnd(start, before, count)) {
+            if (charsOnlyAppended(s, start, before, count)) {
+                sendAppendedChars(s, start, before, count);
+            } else if (charsOnlyDeleted(s, start, before, count)) {
+                sendDeletionsFromEnd(s, start, before, count);
+            } else if (count == before) {
+                if (textActuallyChanged(s, start, before, count)) {
+                    // when entering a space, the previous word is reported as changing for some reason, but it hasn't actually changed, so we must check
+                    sendCompoundReplacementText(s, start, before, count);
                 }
             } else {
-                if (BuildConfig.DEBUG) Log.d(TAG, "Some kind of complex edit occurred 2");
+                if (BuildConfig.DEBUG) Log.d(TAG, "Some kind of complex edit occurred 1");
+                needManualEdit = true;
             }
-            previousEdit = new Edit();
-            previousEdit.start = start;
-            previousEdit.before = before;
-            previousEdit.count = count;
+        } else {
+            if (BuildConfig.DEBUG) Log.d(TAG, "Some kind of complex edit occurred 2");
+            needManualEdit = true;
         }
+        previousEdit = new Edit();
+        previousEdit.start = start;
+        previousEdit.before = before;
+        previousEdit.count = count;
     }
 
     private void sendBackspaces(int howMany) {
@@ -263,7 +271,17 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
     }*/
 
     @Override
-    public void afterTextChanged(Editable s) {
+    public synchronized void afterTextChanged(Editable s) {
+        if (needManualEdit) {
+            makingManualEdit = true;
+            needManualEdit = false;
+            s.replace(0, s.length(), currentText);
+            if (BuildConfig.DEBUG) Log.d(TAG, "initiating replacement to undo prohibited edit");
+        }
+        if (makingManualEdit) {
+            //if (BuildConfig.DEBUG) Log.d(TAG, "ignoring manual edit");
+            makingManualEdit = false;
+        }
 
     }
 }
