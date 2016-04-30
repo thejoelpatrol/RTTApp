@@ -19,11 +19,17 @@ import java.util.Arrays;
 
 
 public class RTTCallActivity extends AppCompatActivity implements TextListener, SessionListener, TextWatcher {
+    private class Edit {
+        public int start;
+        public int before;
+        public int count;
+    }
+
     public static final String TAG = "RTTCallActivity";
     private static final String STATE = "currentText";
     private SipClient texter;
     private CharSequence currentText;
-    //private String contact_URI;
+    private Edit previousEdit;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -125,7 +131,7 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
     @Override
     public synchronized void beforeTextChanged(CharSequence s, int start, int count, int after) {
         if (s.length() > 0)
-            currentText = s.subSequence(0, s.length());
+            currentText = s.subSequence(0, s.length()); // deep copy the text before it is changed so we can compare the new and old versions
     }
 
     @Override
@@ -137,31 +143,48 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
 
             if (count > before) {
                 if (charsOnlyAppended(s, start, before, count)) {
+                    Log.d(TAG, "chars appended");
                     CharSequence added = s.subSequence(start + before, s.length());
                     texter.sendRTTChars(added.toString());
                 } else {
-                    Log.d(TAG, "Some kind of complex edit occurred 1");
+                    if (editOverlappedEnd(start, before, count)) {
+                        Log.d(TAG, "edit overlapped end");
+                        sendBackspaces(before);
+                        CharSequence added = s.subSequence(start, s.length());
+                        texter.sendRTTChars(added.toString());
+                    } else {
+                        Log.d(TAG, "Some kind of complex edit occurred 1");
+                    }
                 }
-
             } else if (count < before) {
                 if (charsOnlyDeleted(s, start, before, count)) {
+                    Log.d(TAG, "chars deleted from end");
                     sendBackspaces(before - count);
+                    if (previousEdit != null && previousEdit.start == start && previousEdit.count == 0) {
+                        // this is the case where the last word has been deleted in two steps by the keyboard, i.e. the cursor is in the middle of the word and it is replaced
+                        sendBackspaces(previousEdit.before);
+                    }
                 } else {
                     Log.d(TAG, "Some kind of complex edit occurred 2");
-                    /*if (textWasReplaced(s, start, before, count)) {
-
-                    }*/
                 }
             } else {
-                if (textActuallyChanged(s, start, before, count)) {
-                    sendCompoundReplacementText(s, start, before, count);
+                // we know before == count
+                if (editOverlappedEnd(start, before, count)) {
+                    if (textActuallyChanged(s, start, before, count)) {
+                        // when entering a space, the previous word is reported as changing for some reason, but it hasn't actually changed, so we must check
+                        sendCompoundReplacementText(s, start, before, count);
+                    } else {
+                        Log.d(TAG, "text did not actually change");
+                        //return;
+                    }
                 } else {
-                    Log.d(TAG, "text did not actually change");
-                    return;
+                    Log.d(TAG, "Some kind of complex edit occurred 3");
                 }
             }
-            //texter.sendRTTChars("a");
-            //currentText = s;
+            previousEdit = new Edit();
+            previousEdit.start = start;
+            previousEdit.before = before;
+            previousEdit.count = count;
         }
     }
 
@@ -180,13 +203,23 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
         texter.sendRTTChars(seq.toString());
     }
 
+    private boolean editOverlappedEnd(int start, int before, int count) {
+        if (count < before)
+            return false;
+        if (start + before == currentText.length())
+            return true;
+        return false;
+    }
+
     private boolean charsOnlyAppended(CharSequence now, int start, int before, int count) {
         if (currentText == null)
             return true;
+        if (!editOverlappedEnd(start, before, count))
+            return false; // some text was changed that was not the LAST part of the string
         if (before == 0)
             return true;
-        if (start + before != currentText.length())
-            return false; // some text was changed that was not the LAST part of the string
+        if (before == count)
+            return false; // the last word was changed, but no additional chars appended
 
         CharSequence origSeq = currentText.subSequence(start, start + before);
         CharSequence newSeq = now.subSequence(start, start + before);
@@ -201,6 +234,8 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
      * Precondition: before > count
      */
     private boolean charsOnlyDeleted(CharSequence s, int start, int before, int count) {
+        if (start + before != currentText.length())
+            return false;
         if (count == 0)
             return true;
         String origString = currentText.subSequence(start, start + count).toString();
