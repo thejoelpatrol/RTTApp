@@ -408,7 +408,7 @@ public class SipClient implements SipListener {
             throw new TransactionUnavailableException("Can't call now -- already modifying call state");
         if (currentCall != null) {
             callLock.release();
-            Log.d(TAG, "555555555 should be 1:" + callLock.availablePermits());
+            if (BuildConfig.DEBUG) Log.d(TAG, "555555555 should be 1:" + callLock.availablePermits());
             throw new TransactionUnavailableException("Can't call now -- already on a call");
         }
         Address contact = addressFactory.createAddress("sip:" + URI);
@@ -437,12 +437,12 @@ public class SipClient implements SipListener {
                 sendControlMessage("Sent INVITE request");
             } else {
                 callLock.release();
-                Log.d(TAG, "6666666666 should be 1:" + callLock.availablePermits());
+                if (BuildConfig.DEBUG) Log.d(TAG, "6666666666 should be 1:" + callLock.availablePermits());
                 throw new SipException("async thread failed to send request");
             }
         } catch (Exception e) {
             callLock.release();
-            Log.d(TAG, "777777777777 should be 1:" + callLock.availablePermits());
+            if (BuildConfig.DEBUG) Log.d(TAG, "777777777777 should be 1:" + callLock.availablePermits());
             e.printStackTrace();
             throw new SipException("couldn't send request; " + e.getMessage());
         }
@@ -594,7 +594,7 @@ public class SipClient implements SipListener {
             if (currentCall.isCalling()) {
                 sendCancel();
                 callLock.release();
-                Log.d(TAG, "88888888888 should be 1:" + callLock.availablePermits());
+                if (BuildConfig.DEBUG) Log.d(TAG, "88888888888 should be 1:" + callLock.availablePermits());
             }
             else if (currentCall.isConnected())
                 sendBye(currentCall.getDialog());
@@ -640,7 +640,7 @@ public class SipClient implements SipListener {
             currentCall.end();
         }
         callLock.release();
-        Log.d(TAG, "9999999999 should be 1:" + callLock.availablePermits());
+        if (BuildConfig.DEBUG) Log.d(TAG, "9999999999 should be 1:" + callLock.availablePermits());
     }
 
     /* I'll be mad if it turns out there is a way to do this automatically with the
@@ -746,7 +746,7 @@ public class SipClient implements SipListener {
         currentCall.end();
         currentCall = null;
         callLock.release();
-        Log.d(TAG, "154254124512 should be 1:" + callLock.availablePermits());
+        if (BuildConfig.DEBUG) Log.d(TAG, "154254124512 should be 1:" + callLock.availablePermits());
     }
 
     private void receiveCall(RequestEvent requestEvent) {
@@ -764,12 +764,12 @@ public class SipClient implements SipListener {
                 // TODO respond 4xx
                 Log.e(TAG, "uh oh, we're releasing this lock...why?");
                 callLock.release();
-                Log.d(TAG, "9807896778956789 should be 1:" + callLock.availablePermits());
+                if (BuildConfig.DEBUG) Log.d(TAG, "9807896778956789 should be 1:" + callLock.availablePermits());
             }
         } else {
             if (lockAvailable) {
                 callLock.release(); // we just acquired this, but can't use it after all
-                Log.d(TAG, "545456767887 should be 1:" + callLock.availablePermits());
+                if (BuildConfig.DEBUG) Log.d(TAG, "545456767887 should be 1:" + callLock.availablePermits());
             }
             RTTCall latestCall = new RTTCall(requestEvent, null, messageReceivers);
             if (currentCall.equals(latestCall)) {
@@ -787,7 +787,7 @@ public class SipClient implements SipListener {
             respondGeneric(initialINVITE, initialINVITE.getServerTransaction(), Response.REQUEST_TERMINATED);
             notifySessionFailed("Caller cancelled call");
             callLock.release();
-            Log.d(TAG, "1111111111 should be 1:" + callLock.availablePermits());
+            if (BuildConfig.DEBUG) Log.d(TAG, "1111111111 should be 1:" + callLock.availablePermits());
             terminateCall();
         }
     }
@@ -848,7 +848,7 @@ public class SipClient implements SipListener {
             currentCall = null;
         }
         callLock.release();
-        Log.d(TAG, "2222222222 should be 1:" + callLock.availablePermits());
+        if (BuildConfig.DEBUG) Log.d(TAG, "2222222222 should be 1:" + callLock.availablePermits());
     }
 
     @Override
@@ -923,7 +923,6 @@ public class SipClient implements SipListener {
 
     /* This usage inspired by https://stackoverflow.com/questions/21840496/asterisk-jain-sip-why-do-i-need-to-authenticate-several-times   */
     private void handleChallenge(ResponseEvent responseEvent) {
-        Log.d(TAG, "!!!! 44444 handling challenge!");
         ClientTransaction origTransaction = responseEvent.getClientTransaction();
         AccountManagerImpl manager = new AccountManagerImpl();
         SipStackExt stack = (SipStackExt)sipStack; // this cast is legal, but sketchy, we need v2.0 of NIST JAIN SIP
@@ -973,7 +972,7 @@ public class SipClient implements SipListener {
             notifySessionFailed("other party doesn't support RTT");
         }
         callLock.release();
-        Log.d(TAG, "44444444444 should be 1:" + callLock.availablePermits());
+        if (BuildConfig.DEBUG) Log.d(TAG, "44444444444 should be 1:" + callLock.availablePermits());
     }
 
     private void ACKResponse(Response response, Dialog dialog) {
@@ -994,7 +993,7 @@ public class SipClient implements SipListener {
                  byte content[] = response.getRawContent();
                 String strContent = new String(content, StandardCharsets.UTF_8);
                 if (strContent.toLowerCase().contains("t140/1000")) {
-                    Log.d(TAG, "It's ACCEPTABLE!!!");
+                    if (BuildConfig.DEBUG) Log.d(TAG, "It's ACCEPTABLE!!!");
                     return true;
                 }
             }
@@ -1015,22 +1014,22 @@ public class SipClient implements SipListener {
 
     @Override
     public void processTimeout(TimeoutEvent timeoutEvent) {
-        //Log.d(TAG, "received a Timeout message");
+        if (BuildConfig.DEBUG) Log.d(TAG, "received a Timeout message");
     }
 
     @Override
     public void processIOException(IOExceptionEvent ioExceptionEvent) {
-        //Log.d(TAG, "received a IOException message: " + ioExceptionEvent.toString());
+        if (BuildConfig.DEBUG) Log.d(TAG, "received a IOException message: " + ioExceptionEvent.toString());
     }
 
     @Override
     public void processTransactionTerminated(TransactionTerminatedEvent transactionTerminatedEvent) {
-        //Log.d(TAG, "received a TransactionTerminated message: " + transactionTerminatedEvent.toString());
+        if (BuildConfig.DEBUG) Log.d(TAG, "received a TransactionTerminated message: " + transactionTerminatedEvent.toString());
     }
 
     @Override
     public void processDialogTerminated(DialogTerminatedEvent dialogTerminatedEvent) {
-        //Log.d(TAG, "received a DialogTerminated message");
+        if (BuildConfig.DEBUG) Log.d(TAG, "received a DialogTerminated message");
         // TODO should I have used this to detect call ending?
     }
 
