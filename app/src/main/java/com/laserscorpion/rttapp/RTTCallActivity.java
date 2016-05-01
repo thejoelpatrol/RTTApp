@@ -1,7 +1,5 @@
 package com.laserscorpion.rttapp;
 
-import android.javax.sip.SipException;
-import android.javax.sip.TransactionUnavailableException;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
@@ -14,7 +12,6 @@ import android.widget.EditText;
 import android.widget.TextView;
 
 import java.nio.charset.StandardCharsets;
-import java.text.ParseException;
 import java.util.Arrays;
 
 
@@ -23,6 +20,10 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
         public int start;
         public int before;
         public int count;
+    }
+    private class CleanString {
+        public int backspaces = 0;
+        public String str = new String();
     }
 
     public static final String TAG = "RTTCallActivity";
@@ -80,12 +81,58 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
 
     private synchronized void addText(final String text) {
         final TextView view = (TextView)findViewById(R.id.textview);
+        final CleanString toAdd = countAndRemoveBackspaces(text);
+        final CharSequence existing;
+
+        if (toAdd.backspaces > 0) {
+            int newlen = Math.max(0, view.getText().length() - toAdd.backspaces);
+            existing = view.getText().subSequence(0, newlen);
+        } else
+            existing = view.getText();
+
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                view.append(text);
+                if (toAdd.backspaces > 0)
+                    view.setText(existing);
+                view.append(toAdd.str);
             }
         });
+    }
+
+    /**
+     * Process incoming text and remove backspaces and the characters they are meant to delete, plus
+     * count how many additional backspaces need to be used to modify other text
+     * @param text the dirty string that may contain backspaces, which we need to remove
+     * @return a CleanString, which is a small struct containing the actual clean string to print to the screen,
+     *          and a count of how many additional backspaces were encountered that need to be used to delete chars
+     *          already printed
+     */
+    private CleanString countAndRemoveBackspaces(String text) {
+        CleanString clean = new CleanString();
+        int i;
+        int initialBS = 0;
+        for (i = 0; i < text.length(); i++) {
+            if (text.charAt(i) != '\u0008')
+                break;
+            initialBS++;
+        }
+        int additionalBS = 0;
+        for (; i < text.length(); i++) {
+            if (text.charAt(i) == '\u0008') {
+                if (clean.str.length() > 0)
+                    clean.str = clean.str.substring(0, clean.str.length() - 1);
+                else
+                    additionalBS++;
+            } else {
+                clean.str = clean.str + text.charAt(i);
+            }
+        }
+        if (additionalBS > 0)
+            clean.backspaces = initialBS + additionalBS;
+        else
+            clean.backspaces = initialBS;
+        return clean;
     }
 
     @Override
