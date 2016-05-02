@@ -79,7 +79,8 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         TextView view = (TextView)findViewById(R.id.textview);
-        outState.putCharSequence(STATE_1, currentText);
+        EditText edit = (EditText)findViewById(R.id.compose_message);
+        outState.putCharSequence(STATE_1, edit.getText());
         outState.putCharSequence(STATE_2, view.getText());
         super.onSaveInstanceState(outState);
     }
