@@ -8,10 +8,11 @@ bugs
 -messed up lock handling for setting up new calls
 -need to re-register after expiration
 -probably don't need to wait on get() any more
--non-printing characters are not received correctly (esp delete!)
+-non-printing characters are not always received correctly
 -@todo Backspace handling in sending messages
--shouldn't allow edits to previous text
 -doze/standby (this is a way future problem)
+-changing entire last word seems to have stopped working with the edit-prevention mechanism
+-occasional bug where one char here or there at the beginning of a changed string is not right
 
 UI deficiencies
 -so ugly

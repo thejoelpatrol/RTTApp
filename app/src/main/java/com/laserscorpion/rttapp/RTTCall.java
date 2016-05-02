@@ -181,7 +181,7 @@ public class RTTCall {
     public void callAccepted(String remoteIP, int remotePort, int localRTPPort, int t140MapNum, int t140RedMapNum) {
         if (!calling)
             throw new IllegalStateException("not calling anyone - what was accepted?");
-        connectCall(remoteIP, remotePort, localRTPPort, t140MapNum, 0);
+        connectCall(remoteIP, remotePort, localRTPPort, t140MapNum, t140RedMapNum);
     }
 
     private synchronized void connectCall(String remoteIP, int remotePort, int localRTPPort, int t140MapNum, int t140RedMapNum) {
