@@ -27,7 +27,8 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
     }
 
     public static final String TAG = "RTTCallActivity";
-    private static final String STATE = "currentText";
+    private static final String STATE_1 = "currentText";
+    private static final String STATE_2 = "receivedText";
     private SipClient texter;
     private CharSequence currentText;
     private Edit previousEdit;
@@ -51,8 +52,10 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
         texter.addSessionListener(this);
 
         if (savedInstanceState != null) {
-            CharSequence oldText = savedInstanceState.getCharSequence(STATE);
+            CharSequence oldText = savedInstanceState.getCharSequence(STATE_1);
             currentText = oldText;
+            CharSequence receivedText = savedInstanceState.getCharSequence(STATE_2);
+            view.setText(receivedText);
         }
     }
 
@@ -75,7 +78,9 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
 
     @Override
     protected void onSaveInstanceState(Bundle outState) {
-        outState.putCharSequence(STATE, currentText);
+        TextView view = (TextView)findViewById(R.id.textview);
+        outState.putCharSequence(STATE_1, currentText);
+        outState.putCharSequence(STATE_2, view.getText());
         super.onSaveInstanceState(outState);
     }
 
