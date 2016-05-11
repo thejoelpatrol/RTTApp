@@ -46,6 +46,8 @@ import java.util.concurrent.Semaphore;
 import android.gov.nist.javax.sip.SipStackExt;
 import android.gov.nist.javax.sip.clientauthutils.*;
 
+import gov.nist.jrtp.RtpException;
+
 /**
  * Some of this class based on http://alex.bikfalvi.com/teaching/upf/2013/architecture_and_signaling/lab/sip/
  */
@@ -84,10 +86,10 @@ public class SipClient implements SipListener {
     private SecureRandom randomGen;
     private enum mediaType  {T140, T140RED};
 
-    /*  callLock is used in a fairly normal way: it must be held whenever making a change
+    /*  callLock has a fairly normal purpose: it must be held whenever making a change
         to currentCall. However, it is sometimes held by an earlier action, a precondition
         of the current action, so it is not necessarily acquired every time currentCall
-        is modified.
+        is modified. This usage is strange, I know.
      */
     private Semaphore callLock;
     //private Semaphore callDestructionLock;
@@ -328,6 +330,12 @@ public class SipClient implements SipListener {
         }
     }
 
+    private void notifySessionEstablished() {
+        for (SessionListener listener : sessionReceivers) {
+            listener.SessionEstablished();
+        }
+    }
+
     public void register() throws android.net.sip.SipException {
         doRegister(DEFAULT_REGISTRATION_LEN, null);
     }
@@ -537,8 +545,16 @@ public class SipClient implements SipListener {
                     Request originalInvite = currentCall.getCreationEvent().getRequest();
                     int suggestedT140Map = getT140MapNum(originalInvite, mediaType.T140);
                     int suggestedT140RedMap = getT140MapNum(originalInvite, mediaType.T140RED);
-                    currentCall.accept(getContactIP(originalInvite), getT140PortNum(originalInvite), port+1, suggestedT140Map, suggestedT140RedMap);
-                    currentCall.addDialog(requestEvent.getDialog());
+                    try {
+                        currentCall.accept(getContactIP(originalInvite), getT140PortNum(originalInvite), port+1, suggestedT140Map, suggestedT140RedMap);
+                        currentCall.addDialog(requestEvent.getDialog());
+                        notifySessionEstablished();
+                    } catch (RtpException e) {
+                        // TODO: throw up a dialog explaining call failure
+                        Log.d(TAG, "call failed");
+                        currentCall = null;
+                        notifySessionFailed("couldn't establish call");
+                    }
                 }
                 else
                     Log.e(TAG, "stray ACK, what do I do? In response to a 488?");
@@ -638,6 +654,8 @@ public class SipClient implements SipListener {
             // TODO handle this
             e.printStackTrace();
             currentCall.end();
+            currentCall = null;
+            notifySessionFailed("couldn't establish call");
         }
         callLock.release();
         if (BuildConfig.DEBUG) Log.d(TAG, "9999999999 should be 1:" + callLock.availablePermits());
@@ -860,7 +878,7 @@ public class SipClient implements SipListener {
             sendControlMessage("SIP error: " + responseCode);
             handleFailure(responseEvent);
         } else if (responseCode >= 200) {
-            sendControlMessage("SIP OK");
+            //sendControlMessage("SIP OK");
             handleSuccess(responseEvent);
         } else {
             if (responseCode == Response.RINGING) {
@@ -963,7 +981,16 @@ public class SipClient implements SipListener {
             Log.d(TAG, "acceptable!");
             int agreedT140MapNum = getT140MapNum(response, mediaType.T140);
             int agreedT140RedMapNum = getT140MapNum(response, mediaType.T140RED);
-            currentCall.callAccepted(getContactIP(response), getT140PortNum(response), port+1, agreedT140MapNum, agreedT140RedMapNum);
+            try {
+                currentCall.callAccepted(getContactIP(response), getT140PortNum(response), port+1, agreedT140MapNum, agreedT140RedMapNum);
+                notifySessionEstablished();
+            } catch (RtpException e) {
+                // TODO: throw up a dialog explaining call failure
+                Log.d(TAG, "call failed");
+                currentCall.end();
+                currentCall = null;
+                notifySessionFailed("couldn't establish call");
+            }
         } else {
             Log.d(TAG, "not acceptable");
             sendBye(dialog);

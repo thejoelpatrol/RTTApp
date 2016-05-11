@@ -66,6 +66,7 @@ public class RTTCall {
     private SyncBuffer outgoingBuf;
     private ReceiveThread recvThread;
     private TextPrintThread printThread;
+    private RtpTextTransmitter transmitter;
     private int t140PayloadNum;
     private int t140RedPayloadNum;
 
@@ -161,8 +162,9 @@ public class RTTCall {
      * @param t140RedMapNum must be <= 0 if not using redundancy! This is the RTP payload map number corresponding to
      *                      "red", the redundant media type, in the agreed session description
      * @throws IllegalStateException if no call is currently ringing
+     * @throws RtpException if the call can't be connected
      */
-    public void accept(String remoteIP, int remotePort, int localRTPPort, int t140MapNum, int t140RedMapNum) throws IllegalStateException {
+    public void accept(String remoteIP, int remotePort, int localRTPPort, int t140MapNum, int t140RedMapNum) throws IllegalStateException, RtpException {
         if (!ringing)
             throw new IllegalStateException("call is not ringing - cannot accept");
         connectCall(remoteIP, remotePort, localRTPPort, t140MapNum, t140RedMapNum);
@@ -177,14 +179,15 @@ public class RTTCall {
      * @param t140RedMapNum must be <= 0 if not using redundancy! This is the RTP payload map number corresponding to
      *                      "red", the redundant media type, in the agreed session description
      * @throws IllegalStateException if no call is currently outgoing
+     * @throws RtpException if the call can't be connected
      */
-    public void callAccepted(String remoteIP, int remotePort, int localRTPPort, int t140MapNum, int t140RedMapNum) {
+    public void callAccepted(String remoteIP, int remotePort, int localRTPPort, int t140MapNum, int t140RedMapNum) throws IllegalStateException, RtpException {
         if (!calling)
             throw new IllegalStateException("not calling anyone - what was accepted?");
         connectCall(remoteIP, remotePort, localRTPPort, t140MapNum, t140RedMapNum);
     }
 
-    private synchronized void connectCall(String remoteIP, int remotePort, int localRTPPort, int t140MapNum, int t140RedMapNum) {
+    private synchronized void connectCall(String remoteIP, int remotePort, int localRTPPort, int t140MapNum, int t140RedMapNum) throws RtpException {
         if (connected)
             throw new IllegalStateException("can't connect call -- already connected on a call");
         if (!ringing && !calling)
@@ -206,19 +209,22 @@ public class RTTCall {
             session.receiveRTPPackets();
             int payloadType = useRed ? t140RedMapNum : t140MapNum;
             //sendThread = new SendThread(session, payloadType);
-            RtpTextTransmitter transmitter = new RtpTextTransmitter(session, true, t140MapNum, useRed,
+            transmitter = new RtpTextTransmitter(session, true, t140MapNum, useRed,
                                                     t140RedMapNum, redGenerations, outgoingBuf, false);
             transmitter.start();
-        } catch (IOException e) {
-            e.printStackTrace();
-            end();
         } catch (RtpException e) {
             e.printStackTrace();
             end();
+            throw e;
+        } catch (IOException e) {
+            e.printStackTrace();
+            end();
+            throw new RtpException(e.getMessage(), e);
         }
         connected = true;
         ringing = false;
         calling = false;
+
     }
 
     public void sendText(String text) {
@@ -242,6 +248,8 @@ public class RTTCall {
                 printThread.stopPrinting();
             if (recvThread != null)
                 recvThread.stopReceiving();
+            if (transmitter != null)
+                transmitter.stop();
             if (session != null) {
                 session.stopRtpPacketReceiver();
                 session.shutDown();

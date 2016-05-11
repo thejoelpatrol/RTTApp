@@ -21,3 +21,7 @@ UI deficiencies
 -entire RegistrationActivity should be replaced with phone book or recent calls or something
 -need to display "from" on incoming call activity
 -app only works in foreground, in RegistrationActivity. should fire an Intent when it's running in bg
+
+Other limitations
+-NAT
+-no tests
