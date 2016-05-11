@@ -11,8 +11,7 @@ bugs
 -non-printing characters are not always received correctly
 -@todo Backspace handling in sending messages
 -doze/standby (this is a way future problem)
--changing entire last word seems to have stopped working with the edit-prevention mechanism
--occasional bug where one char here or there at the beginning of a changed string is not right
+-once in a while a backspace is not counted properly when editing the received text
 
 UI deficiencies
 -so ugly

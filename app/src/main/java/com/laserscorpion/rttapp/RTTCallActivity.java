@@ -212,8 +212,7 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
                 }
             } else {
                 if (BuildConfig.DEBUG) Log.d(TAG, "Some kind of complex edit occurred 1");
-                needManualEdit = true;
-                // we can't allow edits that occur earlier in the text, you can only edit the end
+                sendCompoundReplacementText(s, start, before, count);
             }
         } else {
             if (BuildConfig.DEBUG) Log.d(TAG, "Some kind of complex edit occurred 2");
@@ -254,10 +253,10 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
     }
 
     /**
-     * Precondition: before == count
+     *
      */
     private void sendCompoundReplacementText(CharSequence now, int start, int before, int count) {
-        sendBackspaces(count);
+        sendBackspaces(before);
         CharSequence seq = now.subSequence(start, start + count);
         texter.sendRTTChars(seq.toString());
     }
