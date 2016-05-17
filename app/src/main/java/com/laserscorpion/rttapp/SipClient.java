@@ -768,6 +768,10 @@ public class SipClient implements SipListener {
     }
 
     private void receiveCall(RequestEvent requestEvent) {
+        if (callForSomeoneElse(requestEvent)) {
+            if (BuildConfig.DEBUG) Log.d(TAG, "Call is not for us, ignoring.");
+            return;
+        }
         boolean lockAvailable = callLock.tryAcquire();
         if (lockAvailable && !onACallNow()) {
             Log.d(TAG, "just acquired the lock - permits remaining: " + callLock.availablePermits());
@@ -797,6 +801,29 @@ public class SipClient implements SipListener {
             }
             respondGeneric(requestEvent, null, Response.BUSY_HERE);
         }
+    }
+
+    /**
+     * Is this incoming call even for us, according to its To: header? Or is it just some mass
+     * scan that is checking us out and should be ignored?
+     * @param requestEvent incoming call
+     * @return definitely returns false if we know this call is for us. Definitively returns true
+     * if we can tell the call is for somebody else. If we can't tell due to some error, also returns
+     * true
+     */
+    private boolean callForSomeoneElse(RequestEvent requestEvent) {
+        Request request = requestEvent.getRequest();
+        ToHeader toHeader = (ToHeader)request.getHeader("To");
+        Address to = toHeader.getAddress();
+        try {
+            Address us = addressFactory.createAddress("sip:" + username + "@" + server);
+            if (to.equals(us))
+                return false;
+        } catch (ParseException e) {
+            if (BuildConfig.DEBUG) Log.d(TAG, "Unable to check address - assuming it is not for us");
+            //e.printStackTrace();
+        }
+        return true;
     }
 
     private void cancelCall(RequestEvent requestEvent) {
