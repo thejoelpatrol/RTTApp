@@ -6,12 +6,19 @@ bugs
 	- but who really cares?
 -excess BYEs seem to be sent by the server, but they don’t seem to cause any problems
 -messed up lock handling for setting up new calls
--need to re-register after expiration
+-need to re-register after expiration (set alarm)
 -probably don't need to wait on get() any more
 -non-printing characters are not always received correctly
 -@todo Backspace handling in sending messages
 -doze/standby (this is a way future problem)
--once in a while a backspace is not counted properly when editing the received text
+-Should not handle incoming calls if they are not for us!!!!! 
+	INVITE sip:8011972597740467@160.39.135.227 SIP/2.0
+-sending text before the call is accepted is fatal
+-taking word suggestion of built-in keyboard popup is fatal
+-Swype now seems to have a problem with replacing the last word in two steps?
+-rotating the screen sends the entire text again
+-observed a crash declining a call after receiving a DialogTerminated message
+	-then after this crash, java.lang.IllegalStateException: Singleton SipClient has not been initialized yet - init() before getInstance()
 
 UI deficiencies
 -so ugly
@@ -23,4 +30,5 @@ UI deficiencies
 
 Other limitations
 -NAT
+-Probably doesn't work after IP address changes
 -no tests

@@ -91,8 +91,9 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
         final CharSequence existing;
 
         if (toAdd.backspaces > 0) {
-            int newlen = Math.max(0, view.getText().length() - toAdd.backspaces);
-            existing = view.getText().subSequence(0, newlen);
+            CharSequence textWithNoFEFF = cleanText(view.getText());
+            int newlen = Math.max(0, textWithNoFEFF.length() - toAdd.backspaces);
+            existing = textWithNoFEFF.subSequence(0, newlen);
         } else
             existing = view.getText();
 
@@ -104,6 +105,26 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
                 view.append(toAdd.str);
             }
         });
+    }
+
+    /**
+     * Android framework programmers think that \uFEFF is an acceptable thing to leave in a string,
+     * especially at the end. Unicode has deprecated the usage of this character as a non-breaking
+     * space. These Google devs don't care and use this invisible character to save having to edit
+     * the string sometimes, when a char is deleted at the end. What, do they think that no one will
+     * ever notice that charSequence.length() != actualRealUsefulCharacters.length()? Why don't they
+     * use a null char? I say this is a pure bug in CharSequence.
+     * @param dirty the characters that stupidly end with some number of \uFEFF chars
+     * @return the normal sensible part of this text
+     */
+    private CharSequence cleanText(CharSequence dirty) {
+        int badChars = 0;
+        for (int i = dirty.length() - 1; i >= 0; i--) {
+            if (dirty.charAt(i) == '\uFEFF')
+                badChars++;
+            else break;
+        }
+        return dirty.subSequence(0, dirty.length() - badChars);
     }
 
     /**
@@ -138,6 +159,7 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
             clean.backspaces = initialBS + additionalBS;
         else
             clean.backspaces = initialBS;
+        if (BuildConfig.DEBUG) Log.d(TAG, "bs: " + clean.backspaces);
         return clean;
     }
 
@@ -186,8 +208,7 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
     public synchronized void beforeTextChanged(CharSequence s, int start, int count, int after) {
         if (makingManualEdit)
             return;
-        if (s.length() > 0)
-            currentText = s.subSequence(0, s.length()); // deep copy the text before it is changed so we can compare before and after the edit
+        currentText = s.subSequence(0, s.length()); // deep copy the text before it is changed so we can compare before and after the edit
     }
 
     /**
