@@ -27,6 +27,7 @@ public class SipRequester extends AsyncTask<Request, String, String> {
             return "Success";
         } catch (SipException e) {
             Log.e(TAG, "the request still failed. UGH");
+            Log.e(TAG, "requests[0] = " + requests[0].toString());
             e.printStackTrace();
             return null;
         }

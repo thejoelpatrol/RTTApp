@@ -52,13 +52,13 @@ import gov.nist.jrtp.RtpException;
  * Some of this class based on http://alex.bikfalvi.com/teaching/upf/2013/architecture_and_signaling/lab/sip/
  */
 public class SipClient implements SipListener {
-    private static SipClient instance;
     private static final String TAG = "SipClient";
     private static final int MAX_FWDS = 70;
     private static final int DEFAULT_REGISTRATION_LEN = 600;
     private static final int CALL_RINGING_TIME = 30;
     private static final String ALLOWED_METHODS[] = {Request.ACK, Request.BYE, Request.INVITE, Request.OPTIONS, Request.CANCEL};
     private static final int SAMPLE_RATE = 1000; // defined by RFC 4103 p.15
+    private static SipClient instance;
     private android.content.Context parent;
     private SipFactory sipFactory;
     private SipStack sipStack;
@@ -92,11 +92,7 @@ public class SipClient implements SipListener {
         is modified. This usage is strange, I know.
      */
     private Semaphore callLock;
-    //private Semaphore callDestructionLock;
-    //private RTTCall incomingCall;
     private RTTCall currentCall;
-    //private RTTCall connectedCall;
-    //private RTTCall outgoingCall;
 
     /**
      * Initializes the SipClient to prepare it to register with a server and make calls. Must be called
@@ -351,8 +347,7 @@ public class SipClient implements SipListener {
             if (registrationLength == 0) {
                 cSeqHeader.setSeqNumber(2L);
                 callIdHeader.setCallId(registrationID);
-            }
-            else
+            } else
                 registrationID = callIdHeader.getCallId();
 
             FromHeader fromHeader = headerFactory.createFromHeader(globalSipAddress, String.valueOf(tag));
@@ -367,15 +362,23 @@ public class SipClient implements SipListener {
             Log.d(TAG, "Sending stateful registration for " + globalSipAddress);
             SipRequester requester = new SipRequester(sipProvider);
             requester.execute(request);
-            if (requester.get().equals("Success")) {
+            String result = requester.get();
+            if (result == null) {
+                sendControlMessage("Failed to send registration request. Check logcat");
+                sendControlMessage("Not registered.");
+            } else if (result.equals("Success")) {
                 // get() waits on the other thread
                 // we must wait for the request to send, but not for its response
                 // we (probably) aren't waiting long enough to lose the benefit of threading
                 sendControlMessage("Sent registration request");
+            } else {
+                sendControlMessage("Failed to send registration request. Check logcat");
+                sendControlMessage("Not registered.");
             }
 
         } catch (Exception e) {
-            // TODO handle the again-numerous error cases
+            sendControlMessage("Failed to send registration request. Check logcat");
+            sendControlMessage("Not registered.");
             e.printStackTrace();
         }
     }
@@ -902,7 +905,8 @@ public class SipClient implements SipListener {
         int responseCode = response.getStatusCode();
         Log.d(TAG, "received a response: " + responseCode);
         if (responseCode >= 300) {
-            sendControlMessage("SIP error: " + responseCode);
+            if (responseCode != Response.UNAUTHORIZED)
+                sendControlMessage("SIP error: " + responseCode);
             handleFailure(responseEvent);
         } else if (responseCode >= 200) {
             //sendControlMessage("SIP OK");

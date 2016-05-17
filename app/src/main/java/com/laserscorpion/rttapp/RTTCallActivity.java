@@ -186,7 +186,7 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
 
     @Override
     public void SessionClosed() {
-        addText("Other party hung up.\n");
+        addText("\nOther party hung up.\n");
         // TODO replace with dialog, ask to save text
         try {
             Thread.sleep(2000,0);
