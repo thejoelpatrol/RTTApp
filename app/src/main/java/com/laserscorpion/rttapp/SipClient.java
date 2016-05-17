@@ -332,7 +332,7 @@ public class SipClient implements SipListener {
 
     private void notifySessionEstablished() {
         for (SessionListener listener : sessionReceivers) {
-            listener.SessionEstablished();
+            listener.SessionEstablished(currentCall.getOtherParty().getURI().toString());
         }
     }
 

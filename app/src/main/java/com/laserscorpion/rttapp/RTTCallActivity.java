@@ -152,8 +152,9 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
     }
 
     @Override
-    public void SessionEstablished() {
-        addText("Connected!\n");
+    public void SessionEstablished(String userName) {
+        addText("Connected!\n\n");
+        addText(userName + " says:\n");
     }
 
     public void hangUp(View view) {

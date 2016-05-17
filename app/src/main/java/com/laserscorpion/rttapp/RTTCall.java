@@ -3,6 +3,10 @@ package com.laserscorpion.rttapp;
 import android.javax.sip.Dialog;
 import android.javax.sip.RequestEvent;
 import android.javax.sip.ServerTransaction;
+import android.javax.sip.address.Address;
+import android.javax.sip.header.ContactHeader;
+import android.javax.sip.header.FromHeader;
+import android.javax.sip.header.ToHeader;
 import android.javax.sip.message.Request;
 import android.util.Log;
 
@@ -69,6 +73,7 @@ public class RTTCall {
     private RtpTextTransmitter transmitter;
     private int t140PayloadNum;
     private int t140RedPayloadNum;
+    private Address otherParty;
 
     /**
      * Use this constructor for an incoming call - the requestEvent is the INVITE,
@@ -84,6 +89,8 @@ public class RTTCall {
         this(requestEvent.getRequest(), requestEvent.getDialog(), messageReceivers);
         incomingRequest = requestEvent;
         inviteTransaction = transaction;
+        FromHeader contact = (FromHeader)requestEvent.getRequest().getHeader("From");
+        otherParty = contact.getAddress();
     }
 
     /**
@@ -96,6 +103,8 @@ public class RTTCall {
     public RTTCall(Request creationRequest, Dialog dialog, List<TextListener> messageReceivers) {
         this.creationRequest = creationRequest;
         this.dialog = dialog;
+        ToHeader contact = (ToHeader)creationRequest.getHeader("To");
+        otherParty = contact.getAddress();
         sipClient = SipClient.getInstance();
         destructionLock = new Semaphore(1);
         recvBuf = new FifoBuffer();
@@ -270,6 +279,9 @@ public class RTTCall {
     public boolean isCalling() {
         return calling;
     }
+    public Address getOtherParty() {
+        return otherParty;
+    }
 
 
     /**
@@ -355,7 +367,6 @@ public class RTTCall {
             this.buffer = buffer;
         }
 
-        /* synchronizing on the boolean stop is probably not necessary */
         public void stopPrinting() {
             stop = true;
             synchronized (buffer) {

@@ -7,7 +7,7 @@ import java.util.EventListener;
  */
 public interface SessionListener extends EventListener {
 
-    void SessionEstablished();
+    void SessionEstablished(String userName);
     void SessionClosed();
     void SessionFailed(String reason);
 

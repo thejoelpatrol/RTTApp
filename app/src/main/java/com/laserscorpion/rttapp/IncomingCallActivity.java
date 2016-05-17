@@ -41,7 +41,7 @@ public class IncomingCallActivity extends AppCompatActivity implements SessionLi
     }
 
     @Override
-    public void SessionEstablished() {
+    public void SessionEstablished(String userName) {
         // this should not be called here
     }
 
