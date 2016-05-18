@@ -85,6 +85,7 @@ public class SipClient implements SipListener {
     private CallReceiver callReceiver;
     private SecureRandom randomGen;
     private enum mediaType  {T140, T140RED};
+    private boolean registrationPending = false;
 
     /*  callLock has a fairly normal purpose: it must be held whenever making a change
         to currentCall. However, it is sometimes held by an earlier action, a precondition
@@ -134,13 +135,8 @@ public class SipClient implements SipListener {
         finishInit();
     }
 
-    private void finishInit() throws SipException {
-        try {
-            findLocalIP();
-        } catch (SocketException e) {
-            // TODO: handle this case, throw up an error
-            e.printStackTrace();
-        }
+    private synchronized void finishInit() throws SipException {
+        resetLocalIP();
         sipFactory = SipFactory.getInstance();
         sipFactory.setPathName("android.gov.nist");
         properties = new Properties();
@@ -169,7 +165,39 @@ public class SipClient implements SipListener {
         }
     }
 
-    public void reset(Context context, String username, String server, String password, TextListener listener) throws SipException {
+    private synchronized void resetLocalIP() throws SipException {
+        try {
+            String oldIP = localIP;
+            findLocalIP();
+            if (oldIP == null || !oldIP.equals(localIP)) {
+                if (sipStack != null) {
+                    // assumption: if sipStack != null, neither is addressFactory, headerFactory, etc
+                    if (!onACallNow()) {
+                        // do not delete the socket we are current using to handle signalling for this call
+                        // if our IP address is changing during a call...well...the call will die, for one thing
+                        // that...might be a tricky case
+                        if (listeningPoint != null) {
+                            sipProvider.removeListeningPoint(listeningPoint);
+                            sipStack.deleteListeningPoint(listeningPoint);
+                        }
+                        listeningPoint = sipStack.createListeningPoint(localIP, port, protocol);
+                        sipProvider.addListeningPoint(listeningPoint);
+                    }
+                    Address localSipAddress = addressFactory.createAddress("sip:" + username + "@" + localIP + ":" + listeningPoint.getPort());
+                    localContactHeader = headerFactory.createContactHeader(localSipAddress);
+                }
+            }
+        } catch (SocketException e) {
+            throw new SipException("Error: Unable to get local IP, are you online?", e);
+        } catch (InvalidArgumentException e) {
+            throw new SipException("Error: could not open port for new IP address", e);
+        } catch (ParseException e) {
+            throw new SipException("Error: this shouldn't ever happen! (?) could not create local contact header", e);
+        }
+    }
+
+    public synchronized void reset(Context context, String username, String server, String password, TextListener listener) throws SipException {
+        resetLocalIP();
         Address newGlobalSipAddress = null;
         Address localSipAddress = null;
         try {
@@ -332,15 +360,16 @@ public class SipClient implements SipListener {
         }
     }
 
-    public void register() throws android.net.sip.SipException {
+    public void register() throws SipException {
         doRegister(DEFAULT_REGISTRATION_LEN, null);
     }
 
-    private void doRegister(int registrationLength, Header extraHeader) throws android.net.sip.SipException {
+    private void doRegister(int registrationLength, Header extraHeader) throws SipException {
         int tag = randomGen.nextInt();
         URI requestURI = globalSipAddress.getURI();
 
         try {
+            resetLocalIP(); // every time we register, we should probably make sure we're telling the server the right IP address to reach us...
             ArrayList<ViaHeader> viaHeaders = createViaHeaders();
             CSeqHeader cSeqHeader = headerFactory.createCSeqHeader(1L, "REGISTER");
             CallIdHeader callIdHeader = sipProvider.getNewCallId();
@@ -371,11 +400,14 @@ public class SipClient implements SipListener {
                 // we must wait for the request to send, but not for its response
                 // we (probably) aren't waiting long enough to lose the benefit of threading
                 sendControlMessage("Sent registration request");
+                registrationPending = true;
             } else {
+                Log.e(TAG, "Failed to register: " + result);
                 sendControlMessage("Failed to send registration request. Check logcat");
                 sendControlMessage("Not registered.");
             }
-
+        } catch (SipException e) {
+            sendControlMessage("Failed to send registration request. Trouble finding own IP");
         } catch (Exception e) {
             sendControlMessage("Failed to send registration request. Check logcat");
             sendControlMessage("Not registered.");
@@ -391,7 +423,7 @@ public class SipClient implements SipListener {
         return viaHeaders;
     }
 
-    public void unregister() throws android.net.sip.SipException {
+    public void unregister() throws SipException {
         try {
             Log.d(TAG, "re-registering for time 0");
             doRegister(0, null);
@@ -991,9 +1023,10 @@ public class SipClient implements SipListener {
         Dialog dialog = responseEvent.getDialog();
         if (isInviteResponse(responseEvent))
             handleInviteSuccess(responseEvent);
-        else if (isRegisterResponse(responseEvent))
+        else if (isRegisterResponse(responseEvent)) {
             sendControlMessage("Registered");
-        else
+            registrationPending = false;
+        } else
             Log.d(TAG, "need to implement handling other successes");
     }
 
@@ -1072,12 +1105,25 @@ public class SipClient implements SipListener {
 
     @Override
     public void processTimeout(TimeoutEvent timeoutEvent) {
-        if (BuildConfig.DEBUG) Log.d(TAG, "received a Timeout message");
+        if (registrationPending) {
+            Log.e(TAG, "Registration apparently timed out?");
+            sendControlMessage("Registration timed out");
+            registrationPending = false;
+        } else {
+            if (BuildConfig.DEBUG) Log.d(TAG, "received a Timeout message");
+        }
     }
 
     @Override
     public void processIOException(IOExceptionEvent ioExceptionEvent) {
-        if (BuildConfig.DEBUG) Log.d(TAG, "received a IOException message: " + ioExceptionEvent.toString());
+        if (registrationPending) {
+            Log.e(TAG, "failed to send registration due to: " + ioExceptionEvent.getSource());
+            sendControlMessage("Sending registration to " + ioExceptionEvent.getHost() + ":" +
+                                ioExceptionEvent.getPort() + " failed, check logcat");
+            registrationPending = false;
+        } else {
+            if (BuildConfig.DEBUG) Log.d(TAG, "received a IOException message: " + ioExceptionEvent.toString());
+        }
     }
 
     @Override

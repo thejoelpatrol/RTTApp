@@ -3,8 +3,8 @@ package com.laserscorpion.rttapp;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.javax.sip.SipException;
 import android.javax.sip.TransactionUnavailableException;
-import android.net.sip.SipException;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.support.v7.app.AppCompatActivity;
@@ -102,7 +102,7 @@ public class RTTRegistrationActivity extends AppCompatActivity implements TextLi
         try {
             addText("Registering...\n");
             texter.register();
-        } catch (android.net.sip.SipException e) {
+        } catch (SipException e) {
             // TODO send up a dialog or something
             addText("Failed to register with server: " + e.getMessage());
             return;

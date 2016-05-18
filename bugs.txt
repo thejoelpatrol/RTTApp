@@ -12,8 +12,6 @@ bugs
 -@todo Backspace handling in sending messages
 -doze/standby (this is a way future problem)
 -sipxcom often decides to send us 408, is this our fault?
--Should not handle incoming calls if they are not for us!!!!! 
-	INVITE sip:8011972597740467@160.39.135.227 SIP/2.0
 -sending text before the call is accepted is fatal
 -taking word suggestion of built-in keyboard popup is fatal
 -Swype now seems to have a problem with replacing the last word in two steps?
