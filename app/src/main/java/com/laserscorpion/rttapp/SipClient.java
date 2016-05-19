@@ -1069,9 +1069,9 @@ public class SipClient implements SipListener {
         Dialog dialog = responseEvent.getDialog();
 
         try {
-            Log.d(TAG, "Going to ACK the 2xx");
+            //Log.d(TAG, "Going to ACK the 2xx");
             ACKResponse(response, dialog);
-            Log.d(TAG, "ACKed the 2xx");
+            //Log.d(TAG, "ACKed the 2xx");
         } catch (Exception e) {
             Log.e(TAG, "call failed");
             e.printStackTrace();
@@ -1111,10 +1111,10 @@ public class SipClient implements SipListener {
         CSeqHeader cseq = (CSeqHeader)response.getHeader("CSeq");
         long seqNo = cseq.getSeqNumber();
         AckSender acknowledger = new AckSender(dialog);
-        acknowledger.doInBackground(seqNo);
-        Log.d(TAG, "Should have sent request");
+        acknowledger.execute(seqNo);
+        //Log.d(TAG, "Should have sent request");
         String result = acknowledger.get();
-        Log.d(TAG, "Got some kind of result");
+        //Log.d(TAG, "Got some kind of result");
         if (result == null || !result.equals("Success"))
             throw new SipException("failed to send ACK, call not started");
     }
@@ -1162,6 +1162,9 @@ public class SipClient implements SipListener {
 
     @Override
     public void processTimeout(TimeoutEvent timeoutEvent) {
+        // TODO: use timeoutEvent methods to find out the actual cause of this
+        // probably need to save all the transactions in a hash table or something
+        // so we know what transactions are outstanding
         if (registrationPending) {
             Log.e(TAG, "Registration apparently timed out?");
             sendControlMessage("Registration timed out");
@@ -1206,10 +1209,10 @@ public class SipClient implements SipListener {
         protected String doInBackground(Long... params) {
             Thread.currentThread().setPriority(Thread.MAX_PRIORITY);
             try {
-                Log.d(TAG, "Sending ACK");
+                //Log.d(TAG, "Sending ACK");
                 Request ack = dialog.createAck(params[0]);
                 dialog.sendAck(ack);
-                Log.d(TAG, "Sent ACK, returning");
+                //Log.d(TAG, "Sent ACK, returning");
                 return "Success";
             } catch (InvalidArgumentException e) {
                 e.printStackTrace();
