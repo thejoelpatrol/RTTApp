@@ -61,6 +61,7 @@ public class SipClient implements SipListener {
     private static final int SAMPLE_RATE = 1000; // defined by RFC 4103 p.15
     private static SipClient instance;
     private android.content.Context parent;
+    private boolean useDummyAudio = true;
     private SipFactory sipFactory;
     private SipStack sipStack;
     private SipProvider sipProvider;
@@ -497,11 +498,14 @@ public class SipClient implements SipListener {
     }
 
     private void addSDPContentAndHeader(Message message, int preferredT140Map, int preferredRedMap) {
-        String sdp = createSDPContent(preferredT140Map, preferredRedMap);
-        ContentTypeHeader typeHeader;
         try {
-            typeHeader = headerFactory.createContentTypeHeader("application", "sdp");
-            message.setContent(sdp, typeHeader);
+            String sdp = createRTTSDPContent(preferredT140Map, preferredRedMap);
+            ContentTypeHeader typeHeader = headerFactory.createContentTypeHeader("application", "sdp");
+            if (useDummyAudio) {
+                String audio = createAudioSDPContent(-1, null);
+                message.setContent(sdp + audio, typeHeader);
+            } else
+                message.setContent(sdp, typeHeader);
         } catch (Exception e) {
             // TODO do i need to handle this?
             e.printStackTrace();
@@ -510,12 +514,35 @@ public class SipClient implements SipListener {
     }
 
     /**
+     * we're not actually going to send or receive audio. we are setting up a dummy audio stream
+     * so as to work with Asterisk, which assumes there must always be at least one audio stream
+     * on any type of call.
+     * @param preferredMapNum if we have received a proposed session, use the other party's suggested
+     *                        audio map number. If not, i.e. we are proposing a session, use -1
+     * @param preferredFormat if we have received a proposed session, use the other party's suggested
+     *                        audio format. If not, i.e. we are proposing a session, use null
+     * @return the audio description text to add to the session description
+     * @throws SdpException
+     */
+    private String createAudioSDPContent(int preferredMapNum, String preferredFormat) throws SdpException {
+        int dummyPort = 45678;
+        if (preferredMapNum < 0)
+            preferredMapNum = 0;
+        if (preferredFormat == null)
+            preferredFormat = "PCMU/8000"; // this should be uncontroversial, everyone probably supports this, not that we'll use it
+        int codecs[] = {preferredMapNum};
+        MediaDescription audioMedia = SDPFactory.createMediaDescription("audio", dummyPort, 1, "RTP/AVP", codecs);
+        audioMedia.setAttribute("rtpmap", preferredMapNum + " " + preferredFormat);
+        return audioMedia.toString();
+    }
+
+    /**
      *
      * @param t140MapNum the preferred map number for the red media type, or 0 for no preference
      * @param redMapNum the preferred map number for the red media type, or 0 for no preference, or -1 for no redundancy
      * @return
      */
-    private String createSDPContent(int t140MapNum, int redMapNum) {
+    private String createRTTSDPContent(int t140MapNum, int redMapNum) {
         int sessionID = Math.abs(randomGen.nextInt());
         if (t140MapNum == 0)
             t140MapNum = 100;
@@ -558,7 +585,7 @@ public class SipClient implements SipListener {
             session.setSessionName(SDPFactory.createSessionName("RTT_SDP_v0.1"));
             return session.toString();
         } catch (SdpException e) {
-            Log.e(TAG, "could not create SDP");
+            Log.e(TAG, "could not create SDP: " + e.getMessage());
             e.printStackTrace();
             return null;
         }

@@ -32,3 +32,4 @@ Other limitations
 -IPv6
 -Probably doesn't work after IP address changes
 -no tests
+-factor out SDP into a new class
