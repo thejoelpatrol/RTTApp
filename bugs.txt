@@ -8,7 +8,8 @@ bugs
 -messed up lock handling for setting up new calls
 -need to re-register after expiration (set alarm)
 -probably don't need to wait on get() any more
--non-printing characters are not always received correctly (is this actually true?)
+	-actually, this caught a bug, sort of. if we are going to wait on get(), we should just make sending SIP messages synchronous and get rid of AsyncTask. otherwise, don't wait at all
+-non-printing characters are not always received correctly (cf some weird bad chars sent as newlines from SipCon1)
 -@todo Backspace handling in sending messages
 -doze/standby (this is a way future problem)
 -sipxcom often decides to send us 408, is this our fault?

@@ -61,7 +61,7 @@ public class SipClient implements SipListener {
     private static final int SAMPLE_RATE = 1000; // defined by RFC 4103 p.15
     private static SipClient instance;
     private android.content.Context parent;
-    private boolean useDummyAudio = true;
+    private boolean useDummyAudio = false;
     private SipFactory sipFactory;
     private SipStack sipStack;
     private SipProvider sipProvider;
@@ -1069,9 +1069,7 @@ public class SipClient implements SipListener {
         Dialog dialog = responseEvent.getDialog();
 
         try {
-            //Log.d(TAG, "Going to ACK the 2xx");
             ACKResponse(response, dialog);
-            //Log.d(TAG, "ACKed the 2xx");
         } catch (Exception e) {
             Log.e(TAG, "call failed");
             e.printStackTrace();
@@ -1112,9 +1110,7 @@ public class SipClient implements SipListener {
         long seqNo = cseq.getSeqNumber();
         AckSender acknowledger = new AckSender(dialog);
         acknowledger.execute(seqNo);
-        //Log.d(TAG, "Should have sent request");
         String result = acknowledger.get();
-        //Log.d(TAG, "Got some kind of result");
         if (result == null || !result.equals("Success"))
             throw new SipException("failed to send ACK, call not started");
     }
@@ -1209,10 +1205,8 @@ public class SipClient implements SipListener {
         protected String doInBackground(Long... params) {
             Thread.currentThread().setPriority(Thread.MAX_PRIORITY);
             try {
-                //Log.d(TAG, "Sending ACK");
                 Request ack = dialog.createAck(params[0]);
                 dialog.sendAck(ack);
-                //Log.d(TAG, "Sent ACK, returning");
                 return "Success";
             } catch (InvalidArgumentException e) {
                 e.printStackTrace();
