@@ -1,6 +1,7 @@
 package com.laserscorpion.rttapp;
 
 import android.content.Context;
+import android.content.Intent;
 import android.gov.nist.javax.sdp.fields.AttributeField;
 import android.gov.nist.javax.sip.SipStackImpl;
 import android.gov.nist.javax.sip.address.AddressImpl;
@@ -809,7 +810,7 @@ public class SipClient implements SipListener {
         }
         boolean lockAvailable = callLock.tryAcquire();
         if (lockAvailable && !onACallNow()) {
-            Log.d(TAG, "just acquired the lock - permits remaining: " + callLock.availablePermits());
+            if (BuildConfig.DEBUG) Log.d(TAG, "just acquired the lock - permits remaining: " + callLock.availablePermits());
             Log.d(TAG, "we're available...");
             if (callReceiver != null) {
                 Log.d(TAG, "asking receiver to accept...");
@@ -937,7 +938,7 @@ public class SipClient implements SipListener {
         int responseCode = response.getStatusCode();
         Log.d(TAG, "received a response: " + responseCode);
         if (responseCode >= 300) {
-            if (responseCode != Response.UNAUTHORIZED)
+            if (responseCode != Response.UNAUTHORIZED && responseCode != Response.PROXY_AUTHENTICATION_REQUIRED)
                 sendControlMessage("SIP error: " + responseCode);
             handleFailure(responseEvent);
         } else if (responseCode >= 200) {
@@ -1011,7 +1012,9 @@ public class SipClient implements SipListener {
         try {
             ClientTransaction transaction = authenticator.handleChallenge(responseEvent.getResponse(), origTransaction, sipProvider, 10);
             SipTransactionRequester requester = new SipTransactionRequester(sipProvider);
+            Log.d(TAG, "Sending credentials in response to challenge");
             requester.execute(transaction);
+            Log.d(TAG, "Sent credentials in response to challenge");
         } catch (Exception e) {
             Log.e(TAG, "Unable to respond to challenge");
             e.printStackTrace();
@@ -1038,7 +1041,18 @@ public class SipClient implements SipListener {
         Response response = responseEvent.getResponse();
         Dialog dialog = responseEvent.getDialog();
 
-        ACKResponse(response, dialog);
+        try {
+            Log.d(TAG, "Going to ACK the 2xx");
+            ACKResponse(response, dialog);
+            Log.d(TAG, "ACKed the 2xx");
+        } catch (Exception e) {
+            Log.e(TAG, "call failed");
+            e.printStackTrace();
+            currentCall.end();
+            currentCall = null;
+            notifySessionFailed("couldn't establish call");
+            return;
+        }
 
         currentCall.addDialog(dialog);
         if (sessionIsAcceptable(response)) {
@@ -1066,11 +1080,16 @@ public class SipClient implements SipListener {
         if (BuildConfig.DEBUG) Log.d(TAG, "44444444444 should be 1:" + callLock.availablePermits());
     }
 
-    private void ACKResponse(Response response, Dialog dialog) {
+    private void ACKResponse(Response response, Dialog dialog) throws Exception {
         CSeqHeader cseq = (CSeqHeader)response.getHeader("CSeq");
         long seqNo = cseq.getSeqNumber();
         AckSender acknowledger = new AckSender(dialog);
         acknowledger.doInBackground(seqNo);
+        Log.d(TAG, "Should have sent request");
+        String result = acknowledger.get();
+        Log.d(TAG, "Got some kind of result");
+        if (result == null || !result.equals("Success"))
+            throw new SipException("failed to send ACK, call not started");
     }
 
     private boolean sessionIsAcceptable(Response response) {
@@ -1103,6 +1122,17 @@ public class SipClient implements SipListener {
         Log.d(TAG, "(Not actually) sending CANCEL");
     }
 
+    //@Override
+    public void onReceive(final Context context, final Intent intent) {
+        if (intent.getAction().equals(ConnectivityManager.CONNECTIVITY_ACTION)) {
+            ConnectivityManager connMgr = (ConnectivityManager) parent.getSystemService(Context.CONNECTIVITY_SERVICE);
+            NetworkInfo networkInfo = connMgr.getActiveNetworkInfo();
+            //if (networkInfo.isConnected())
+                //resetLocalIP();
+
+        }
+    }
+
     @Override
     public void processTimeout(TimeoutEvent timeoutEvent) {
         if (registrationPending) {
@@ -1116,14 +1146,15 @@ public class SipClient implements SipListener {
 
     @Override
     public void processIOException(IOExceptionEvent ioExceptionEvent) {
-        if (registrationPending) {
+       /* if (registrationPending) {
             Log.e(TAG, "failed to send registration due to: " + ioExceptionEvent.getSource());
             sendControlMessage("Sending registration to " + ioExceptionEvent.getHost() + ":" +
-                                ioExceptionEvent.getPort() + " failed, check logcat");
+                    ioExceptionEvent.getPort() + " failed, check logcat");
             registrationPending = false;
         } else {
             if (BuildConfig.DEBUG) Log.d(TAG, "received a IOException message: " + ioExceptionEvent.toString());
-        }
+        }*/
+        // not sure if i should actually do anything here, since there is NO WAY to tell what really caused this exception
     }
 
     @Override
@@ -1134,7 +1165,7 @@ public class SipClient implements SipListener {
     @Override
     public void processDialogTerminated(DialogTerminatedEvent dialogTerminatedEvent) {
         if (BuildConfig.DEBUG) Log.d(TAG, "received a DialogTerminated message");
-        // TODO should I have used this to detect call ending?
+        // TODO should I have used this to detect call ending? no, probably not
     }
 
     // these nested classes are used to fire one-off threads and then die
@@ -1146,9 +1177,13 @@ public class SipClient implements SipListener {
 
         @Override
         protected String doInBackground(Long... params) {
+            Thread.currentThread().setPriority(Thread.MAX_PRIORITY);
             try {
+                Log.d(TAG, "Sending ACK");
                 Request ack = dialog.createAck(params[0]);
                 dialog.sendAck(ack);
+                Log.d(TAG, "Sent ACK, returning");
+                return "Success";
             } catch (InvalidArgumentException e) {
                 e.printStackTrace();
             } catch (SipException e) {
@@ -1165,6 +1200,7 @@ public class SipClient implements SipListener {
 
         @Override
         protected String doInBackground(Dialog... dialogs) {
+            Thread.currentThread().setPriority(Thread.MAX_PRIORITY);
             try {
                 Dialog dialog = dialogs[0];
                 Request bye = dialog.createRequest(Request.BYE);

@@ -29,5 +29,6 @@ UI deficiencies
 
 Other limitations
 -NAT
+-IPv6
 -Probably doesn't work after IP address changes
 -no tests
