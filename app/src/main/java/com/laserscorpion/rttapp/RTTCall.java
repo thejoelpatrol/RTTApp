@@ -74,6 +74,7 @@ public class RTTCall {
     private int t140PayloadNum;
     private int t140RedPayloadNum;
     private Address otherParty;
+    private List<TextListener> messageReceivers;
 
     /**
      * Use this constructor for an incoming call - the requestEvent is the INVITE,
@@ -108,7 +109,8 @@ public class RTTCall {
         sipClient = SipClient.getInstance();
         destructionLock = new Semaphore(1);
         recvBuf = new FifoBuffer();
-        printThread = new TextPrintThread(messageReceivers, recvBuf);
+        this.messageReceivers = messageReceivers;
+        printThread = new TextPrintThread(this, recvBuf);
         printThread.start();
         try {
             manager = new RtpManager(sipClient.getLocalIP());
@@ -134,6 +136,9 @@ public class RTTCall {
         this.dialog = dialog;
     }
 
+    public synchronized void resetMessageReceivers(List<TextListener> messageReceivers) {
+       this.messageReceivers = messageReceivers;
+    }
 
     /**
      * Precondition: call was created by an incoming RequestEvent. If call
@@ -358,12 +363,14 @@ public class RTTCall {
      * it to the UI class(es) that are waiting to display it.
      */
     private class TextPrintThread extends Thread {
-        List<TextListener> messageReceivers;
+        //List<TextListener> messageReceivers;
+        RTTCall parent;
         FifoBuffer buffer;
         boolean stop = false;
 
-        public TextPrintThread(List<TextListener> messageReceivers, FifoBuffer buffer) {
-            this.messageReceivers = messageReceivers;
+        public TextPrintThread(RTTCall parent, FifoBuffer buffer) {
+            //this.messageReceivers = messageReceivers;
+            this.parent = parent;
             this.buffer = buffer;
         }
 
@@ -382,9 +389,11 @@ public class RTTCall {
                 try {
                     received = buffer.getData(); // this blocks until there is something in the fifo
                     if (received != null) {
-                        for (TextListener receiver : messageReceivers) {
-                            String text = new String(received, StandardCharsets.UTF_8);
-                            receiver.RTTextReceived(text);
+                        synchronized (parent) {
+                            for (TextListener receiver : messageReceivers) {
+                                String text = new String(received, StandardCharsets.UTF_8);
+                                receiver.RTTextReceived(text);
+                            }
                         }
                     }
                 } catch (InterruptedException e) {/* that's fine */}

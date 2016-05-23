@@ -304,10 +304,11 @@ public class SipClient implements SipListener {
      *                    messages from from the SipClient. If null, the SipClient's
      *                    text output will not be processed by anyone.
      */
-    public void addTextReceiver(TextListener newReceiver) {
+    public synchronized void addTextReceiver(TextListener newReceiver) {
         if (messageReceivers.contains(newReceiver))
             return;
         messageReceivers.add(newReceiver);
+        notify();
     }
 
     /**
@@ -364,7 +365,7 @@ public class SipClient implements SipListener {
         try {
             /* this is a bad concurrency hack to make sure the SessionListener has
             registered before it must be killed due to receiving an immediate BYE */
-            Thread.sleep(500, 0);
+            Thread.sleep(500);
         } catch (InterruptedException e) {}
 
         for (SessionListener listener : sessionReceivers) {
@@ -373,7 +374,14 @@ public class SipClient implements SipListener {
     }
 
     private void notifySessionEstablished() {
+        Log.d(TAG, "Notifying that call is connected");
+        try {
+              /* this is a bad concurrency hack to make sure the SessionListener has
+            registered before it is notified that the call is connected */
+            Thread.sleep(300);
+        } catch (InterruptedException e) {}
         for (SessionListener listener : sessionReceivers) {
+            Log.d(TAG, "Notifying a listenier that call is connected");
             listener.SessionEstablished(currentCall.getOtherParty().getURI().toString());
         }
     }
@@ -534,6 +542,12 @@ public class SipClient implements SipListener {
                     try {
                         currentCall.accept(getContactIP(originalInvite), SDPBuilder.getT140PortNum(originalInvite), port+1, suggestedT140Map, suggestedT140RedMap);
                         currentCall.addDialog(requestEvent.getDialog());
+                        synchronized (this) {
+                            try {
+                                wait(1000);
+                            } catch (InterruptedException e) {}
+                        }
+                        currentCall.resetMessageReceivers(messageReceivers);
                         notifySessionEstablished();
                     } catch (RtpException e) {
                         // TODO: throw up a dialog explaining call failure

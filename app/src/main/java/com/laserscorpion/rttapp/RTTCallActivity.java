@@ -48,8 +48,8 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
         view.setMovementMethod(new ScrollingMovementMethod());
 
         texter = SipClient.getInstance();
-        texter.addTextReceiver(this);
         texter.addSessionListener(this);
+        texter.addTextReceiver(this);
 
         if (savedInstanceState != null) {
             CharSequence oldText = savedInstanceState.getCharSequence(STATE_1);
