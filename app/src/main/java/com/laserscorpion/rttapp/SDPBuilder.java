@@ -107,7 +107,7 @@ public class SDPBuilder {
                 codecs[0] = t140MapNum;
                 codecs[1] = redMapNum;
             }
-            MediaDescription textMedia = factory.createMediaDescription("text", sender.port+1, 1, "RTP/AVP", codecs);
+            MediaDescription textMedia = factory.createMediaDescription("text", sender.port, 1, "RTP/AVP", codecs);
             textMedia.setAttribute("rtpmap", t140MapNum + " t140/" + SAMPLE_RATE);
             if (redMapNum > 0) {
                 AttributeField redAttr = new AttributeField();
