@@ -10,6 +10,7 @@ import android.preference.PreferenceManager;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.text.method.ScrollingMovementMethod;
+import android.util.Log;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.TextView;
@@ -41,10 +42,11 @@ public class RTTRegistrationActivity extends AppCompatActivity implements TextLi
         PASSWORD_PREF_NAME = getString(R.string.pref_password_qualified);
         try {
             SipClient.init(this, getUsername(), getRegistrar(), getPassword(), this);
-        } catch (android.javax.sip.SipException e) {
+        } catch (SipException e) {
+            Log.e(TAG, "Failed to initialize SIP stack", e);
             addText("Error: failed to initialize SIP stack");
+            finish();
             // TODO replace this with a dialog
-            // TODO prevent anything else from being attempted - kill the activity
         }
         texter = SipClient.getInstance();
         texter.registerCallReceiver(this);
@@ -73,7 +75,8 @@ public class RTTRegistrationActivity extends AppCompatActivity implements TextLi
            For now, screen rotation is disabled in this activity
         */
         try {
-            texter.unregister();
+            if (texter != null)
+                texter.unregister();
             //texter.close();
         } catch (SipException e) {
             addText("Failed to unregister: " + e);

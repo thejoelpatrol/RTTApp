@@ -29,6 +29,7 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.javax.sip.*;
 
+import java.net.BindException;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
@@ -150,8 +151,7 @@ public class SipClient implements SipListener {
             headerFactory = sipFactory.createHeaderFactory();
             addressFactory = sipFactory.createAddressFactory();
             //SDPFactory = SdpFactory.getInstance();
-            listeningPoint = sipStack.createListeningPoint(localIP, port, protocol); // a ListeningPoint is a socket wrapper
-            // TODO allow different ports if this one is not available
+            openListeningPoint();
             sipProvider = sipStack.createSipProvider(listeningPoint);
             sipProvider.addSipListener(this);
             Address localSipAddress = addressFactory.createAddress("sip:" + username + "@" + localIP + ":" + listeningPoint.getPort());
@@ -160,7 +160,26 @@ public class SipClient implements SipListener {
             allowHeader = headerFactory.createAllowHeader(TextUtils.join(", ", ALLOWED_METHODS));
             maxForwardsHeader = headerFactory.createMaxForwardsHeader(MAX_FWDS);
         } catch (Exception e) {
-            throw new SipException("Error: could not create SIP stack");
+            throw new SipException("Error: could not create SIP stack", e);
+        }
+    }
+
+    private void openListeningPoint() throws SipException {
+        while (listeningPoint == null) {
+            try {
+                listeningPoint = sipStack.createListeningPoint(localIP, port, protocol); // a ListeningPoint is a socket wrapper
+                return;
+            } catch (InvalidArgumentException e) {
+                if (e.getMessage().contains("BindException")) { // getCause() strangely returns e, not the BindException that caused it, so check the string
+                    if (port > 65535)
+                        throw new SipException("could not create listening point - no ports available", e);
+                    port++; // loop, try the next port
+                } else {
+                    throw new SipException("could not create listening point", e);
+                }
+            } catch (SipException e) {
+                throw new SipException("could not create listening point", e);
+            }
         }
     }
 
@@ -220,7 +239,7 @@ public class SipClient implements SipListener {
      * Precondition: init() must be called first at least once
      * @return a handle to the single global SipClient
      */
-    public static SipClient getInstance() {
+    public static SipClient getInstance() throws IllegalStateException {
         if (instance == null)
             throw new IllegalStateException("Singleton SipClient has not been initialized yet - init() before getInstance()");
         return instance;
