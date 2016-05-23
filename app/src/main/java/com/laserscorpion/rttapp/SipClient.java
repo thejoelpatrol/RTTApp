@@ -709,6 +709,12 @@ public class SipClient implements SipListener {
             Address us = addressFactory.createAddress("sip:" + username + "@" + server);
             if (to.equals(us))
                 return false;
+            us = addressFactory.createAddress("sip:" + username + "@" + localIP);
+            if (to.equals(us))
+                return false;
+            us = addressFactory.createAddress("sip:" + username + "@" + localIP + ":" + port);
+            if (to.equals(us))
+                return false;
         } catch (ParseException e) {
             if (BuildConfig.DEBUG) Log.d(TAG, "Unable to check address - assuming it is not for us");
             //e.printStackTrace();
