@@ -22,15 +22,6 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".CallActivity"
-            android:label="@string/title_activity_display_message"
-            android:parentActivityName=".FirstActivity"
-            android:theme="@style/AppTheme.NoActionBar">
-            <meta-data
-                android:name="android.support.PARENT_ACTIVITY"
-                android:value=".FirstActivity" />
-        </activity>
-        <activity
             android:name=".SettingsActivity"
             android:label="@string/title_activity_settings"
             android:theme="@style/AppTheme.NoActionBar" />

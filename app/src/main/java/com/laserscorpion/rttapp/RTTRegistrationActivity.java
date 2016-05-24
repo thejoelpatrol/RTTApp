@@ -23,9 +23,6 @@ public class RTTRegistrationActivity extends AppCompatActivity implements TextLi
     private String REGISTRAR_PREF_NAME; // these are basically constants
     private String USERNAME_PREF_NAME; // but you can't access xml resources statically
     private String PASSWORD_PREF_NAME;
-    protected SipRTTCall call = null;
-    protected SipRTTManager sipManager;
-    protected RTTIncomingCallReceiver callReceiver;
     private SipClient texter;
 
     @Override
@@ -111,15 +108,7 @@ public class RTTRegistrationActivity extends AppCompatActivity implements TextLi
             return;
         }
         
-        //registerCallReceiver();
     }
-
-    /*private void registerCallReceiver() {
-        IntentFilter filter = new IntentFilter();
-        filter.addAction("com.laserscorpion.rttapp.INCOMING_CALL");
-        callReceiver = new RTTIncomingCallReceiver();
-        this.registerReceiver(callReceiver, filter);
-    }*/
 
     private void addText(final String text) {
         final TextView view = (TextView)findViewById(R.id.textview);

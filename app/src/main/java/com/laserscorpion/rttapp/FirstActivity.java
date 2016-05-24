@@ -15,8 +15,6 @@ public class FirstActivity extends AppCompatActivity {
     public static final String EXTRA_MESSAGE = "com.laserscorpion.rttapp.MESSAGE";
     public static final String TAG = "RTTApp";
     private String REGISTRAR_PREF_NAME; // these are basically constants
-    protected SipRTTCall call = null;
-    protected RTTIncomingCallReceiver callReceiver;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
