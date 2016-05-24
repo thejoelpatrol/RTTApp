@@ -19,6 +19,7 @@ bugs
 -rotating the screen sends the entire text again
 -observed a crash declining a call after receiving a DialogTerminated message, or maybe it was in responding to a second incoming call when one was already incoming?
 	-then after this crash, java.lang.IllegalStateException: Singleton SipClient has not been initialized yet - init() before getInstance()
+-try connecting to a domain name, including a bad one
 
 UI deficiencies
 -so ugly
@@ -26,11 +27,10 @@ UI deficiencies
 -log in RegistrationActivity is probably not useful
 -entire RegistrationActivity should be replaced with phone book or recent calls or something
 -need to display "from" on incoming call activity
--app only works in foreground, in RegistrationActivity. should fire an Intent when it's running in bg
+-make sure app continues running in bg - consider adding a service?
+-should vibrate on incoming call
 
 Other limitations
 -NAT
 -IPv6
--Probably doesn't work after IP address changes
 -no tests
--factor out SDP into a new class

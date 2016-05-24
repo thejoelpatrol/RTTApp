@@ -1,7 +1,9 @@
 package com.laserscorpion.rttapp;
 
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.gov.nist.javax.sdp.fields.AttributeField;
 import android.gov.nist.javax.sip.SipStackImpl;
 import android.gov.nist.javax.sip.address.AddressImpl;
@@ -48,12 +50,14 @@ import java.util.concurrent.Semaphore;
 import android.gov.nist.javax.sip.SipStackExt;
 import android.gov.nist.javax.sip.clientauthutils.*;
 
+import com.laserscorpion.rttapp.ConnectivityReceiver.IPChangeListener;
+
 import gov.nist.jrtp.RtpException;
 
 /**
  * Some of this class based on http://alex.bikfalvi.com/teaching/upf/2013/architecture_and_signaling/lab/sip/
  */
-public class SipClient implements SipListener {
+public class SipClient implements SipListener, IPChangeListener {
     private static final String TAG = "SipClient";
     private static final int MAX_FWDS = 70;
     private static final int DEFAULT_REGISTRATION_LEN = 600;
@@ -130,6 +134,8 @@ public class SipClient implements SipListener {
         sessionReceivers = new LinkedList<SessionListener>();
         randomGen = new SecureRandom();
         callLock = new Semaphore(1);
+
+        parent.registerReceiver(new ConnectivityReceiver(this), new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION));
         //callDestructionLock = new Semaphore(1);
         //allowed_methods = TextUtils.join(", ", ALLOWED_METHODS);
         finishInit();
@@ -521,7 +527,7 @@ public class SipClient implements SipListener {
     }
 
 
-
+    // SipProvider
     @Override
     public void processRequest(RequestEvent requestEvent) {
         Request request = requestEvent.getRequest();
@@ -806,6 +812,8 @@ public class SipClient implements SipListener {
      * @param requestEvent a BYE request we have just received
      */
     private void endCall(RequestEvent requestEvent) {
+        // TODO make sure this is actually appropriate and not stray!
+
         // TODO do I need to do anything else to tear down the session? maybe close the RTP streams once I have them
         Request request = requestEvent.getRequest();
         respondGeneric(requestEvent, null, Response.OK);
@@ -1011,17 +1019,6 @@ public class SipClient implements SipListener {
         Log.d(TAG, "(Not actually) sending CANCEL");
     }
 
-    //@Override
-    public void onReceive(final Context context, final Intent intent) {
-        if (intent.getAction().equals(ConnectivityManager.CONNECTIVITY_ACTION)) {
-            ConnectivityManager connMgr = (ConnectivityManager) parent.getSystemService(Context.CONNECTIVITY_SERVICE);
-            NetworkInfo networkInfo = connMgr.getActiveNetworkInfo();
-            //if (networkInfo.isConnected())
-                //resetLocalIP();
-
-        }
-    }
-
     @Override
     public void processTimeout(TimeoutEvent timeoutEvent) {
         // TODO: use timeoutEvent methods to find out the actual cause of this
@@ -1058,6 +1055,21 @@ public class SipClient implements SipListener {
     public void processDialogTerminated(DialogTerminatedEvent dialogTerminatedEvent) {
         if (BuildConfig.DEBUG) Log.d(TAG, "received a DialogTerminated message");
         // TODO should I have used this to detect call ending? no, probably not
+    }
+
+    // ConnectivityReceiver.IPChangeListener
+    @Override
+    public void IPAddrChanged() {
+        try {
+            if (BuildConfig.DEBUG) Log.d(TAG, "Resetting IP due to connectivity change, reregistering");
+            if (BuildConfig.DEBUG) Log.d(TAG, "current IP: " + localIP);
+            resetLocalIP();
+            sendControlMessage("Network changed, reregistering");
+            register();
+            if (BuildConfig.DEBUG) Log.d(TAG, "new IP: " + localIP);
+        } catch (SipException e) {
+            sendControlMessage("Error: troubling re-finding own IP ... connection possibly lost");
+        }
     }
 
     // these nested classes are used to fire one-off threads and then die
