@@ -35,6 +35,7 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
     private boolean makingManualEdit = false;
     private boolean needManualEdit = false; // flag that indicates that we need to undo the text change the user made - not allowed to edit earlier text
     private boolean screenRotated = false;
+    private String otherParty;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -52,8 +53,8 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
         texter.addSessionListener(this);
         texter.addTextReceiver(this);
 
-        String with = getIntent().getStringExtra("com.laserscorpion.rttapp.contact_uri");
-        setTitle("Call with " + with);
+        otherParty = getIntent().getStringExtra("com.laserscorpion.rttapp.contact_uri");
+        setTitle("Call with " + otherParty);
 
         if (savedInstanceState != null) {
             CharSequence oldText = savedInstanceState.getCharSequence(STATE_1);
@@ -191,7 +192,7 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
 
     @Override
     public void SessionClosed() {
-        addText("\nOther party hung up.\n");
+        addText("\n\n***" + otherParty + " hung up.\n");
         // TODO replace with dialog, ask to save text
         try {
             Thread.sleep(2000,0);
