@@ -34,6 +34,7 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
     private Edit previousEdit;
     private boolean makingManualEdit = false;
     private boolean needManualEdit = false; // flag that indicates that we need to undo the text change the user made - not allowed to edit earlier text
+    private boolean screenRotated = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,6 +56,7 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
             CharSequence oldText = savedInstanceState.getCharSequence(STATE_1);
             currentText = oldText;
             CharSequence receivedText = savedInstanceState.getCharSequence(STATE_2);
+            screenRotated = true;
             view.setText(receivedText);
         }
     }
@@ -219,6 +221,10 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
         if (makingManualEdit) {
             if (BuildConfig.DEBUG) Log.d(TAG, "ignoring manual edit");
             return;
+        }
+        if (screenRotated) {
+            screenRotated = false;
+            return; // ignore text addition due to destruction and recreation of activity
         }
         if (BuildConfig.DEBUG) Log.d(TAG, "text changed! start: " + start + " | before: " + before + " | count: " + count);
 
