@@ -1061,9 +1061,19 @@ public class SipClient implements SipListener, IPChangeListener {
     @Override
     public void IPAddrChanged() {
         try {
+            String oldIP = localIP;
             if (BuildConfig.DEBUG) Log.d(TAG, "Resetting IP due to connectivity change, reregistering");
             if (BuildConfig.DEBUG) Log.d(TAG, "current IP: " + localIP);
             resetLocalIP();
+            if (oldIP.equals(localIP)) {
+                // on at least one device, this appears to be called before the new IP is truly set
+                // so, here is a bad concurrency hack for Motorola's problem, not mine!
+                // wait a bit, then try again just to make sure it is reset when it needs to be
+                try {
+                    Thread.sleep(300);
+                } catch (InterruptedException e) {}
+                resetLocalIP();
+            }
             sendControlMessage("Network changed, reregistering");
             register();
             if (BuildConfig.DEBUG) Log.d(TAG, "new IP: " + localIP);
