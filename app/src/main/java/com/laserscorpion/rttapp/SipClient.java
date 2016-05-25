@@ -337,10 +337,12 @@ public class SipClient implements SipListener, IPChangeListener {
     }
 
     public void addSessionListener(SessionListener newListener) {
-        if (sessionReceivers.contains(newListener))
-            return;
-        sessionReceivers.add(newListener);
-
+        synchronized (sessionReceivers) {
+            if (sessionReceivers.contains(newListener))
+                return;
+            sessionReceivers.add(newListener);
+            sessionReceivers.notify();
+        }
     }
     public void removeSessionListener(SessionListener existingListener) {
         if (sessionReceivers.contains(existingListener))
@@ -380,15 +382,16 @@ public class SipClient implements SipListener, IPChangeListener {
     }
 
     private void notifySessionEstablished() {
-        Log.d(TAG, "Notifying that call is connected");
+        //Log.d(TAG, "Notifying that call is connected");
         try {
-              /* this is a bad concurrency hack to make sure the SessionListener has
-            registered before it is notified that the call is connected */
-            Thread.sleep(300);
+            synchronized (sessionReceivers) {
+                sessionReceivers.wait(500); // make sure call activity has time to register itself as a listener
+            }
         } catch (InterruptedException e) {}
         for (SessionListener listener : sessionReceivers) {
-            Log.d(TAG, "Notifying a listenier that call is connected");
-            listener.SessionEstablished(currentCall.getOtherParty().getURI().toString());
+            //Log.d(TAG, "Notifying a listener that call is connected");
+            SipURI uri = (SipURI)currentCall.getOtherParty().getURI();
+            listener.SessionEstablished(uri.getUser() + "@" + uri.getHost());
         }
     }
 
