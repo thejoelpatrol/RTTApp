@@ -161,8 +161,9 @@ public class RTTRegistrationActivity extends AppCompatActivity implements TextLi
     }
 
     @Override
-    public void callReceived(/*RTTCall incomingCall*/) {
+    public void callReceived(String from) {
         Intent intent = new Intent(this, IncomingCallActivity.class);
+        intent.putExtra("com.laserscorpion.rttapp.contact_uri", from);
         startActivity(intent);
     }
 }

@@ -8,5 +8,5 @@ public interface CallReceiver {
      * Called when a new call is coming in. The receiver should then accept or decline the call
      * via the SipClient.
      */
-    void callReceived(/*RTTCall incomingCall*/);
+    void callReceived(String from);
 }

@@ -16,7 +16,6 @@ bugs
 -sending text before the call is accepted is fatal
 -taking word suggestion of built-in keyboard popup is fatal - how to cause this to appear? i don't see that popup any more
 -Swype now seems to have a problem with replacing the last word in two steps?
--rotating the screen sends the entire text again
 -observed a crash declining a call after receiving a DialogTerminated message, or maybe it was in responding to a second incoming call when one was already incoming?
 	-then after this crash, java.lang.IllegalStateException: Singleton SipClient has not been initialized yet - init() before getInstance()
 -try connecting to a domain name, including a bad one
@@ -26,7 +25,6 @@ UI deficiencies
 -report errors via dialogs
 -log in RegistrationActivity is probably not useful
 -entire RegistrationActivity should be replaced with phone book or recent calls or something
--need to display "from" on incoming call activity
 -make sure app continues running in bg - consider adding a service?
 -should vibrate on incoming call
 

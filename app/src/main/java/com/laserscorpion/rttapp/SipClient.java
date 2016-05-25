@@ -710,7 +710,7 @@ public class SipClient implements SipListener, IPChangeListener {
                 ServerTransaction transaction = respondGeneric(requestEvent, null, Response.RINGING);
                 currentCall = new RTTCall(requestEvent, transaction, messageReceivers);
                 currentCall.setRinging();
-                callReceiver.callReceived();
+                callReceiver.callReceived(currentCall.getOtherParty().getURI().toString());
             } else {
                 // TODO respond 4xx
                 Log.e(TAG, "uh oh, we're releasing this lock...why?");

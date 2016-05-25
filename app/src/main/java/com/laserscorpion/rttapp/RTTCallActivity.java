@@ -52,6 +52,9 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
         texter.addSessionListener(this);
         texter.addTextReceiver(this);
 
+        String with = getIntent().getStringExtra("com.laserscorpion.rttapp.contact_uri");
+        setTitle("Call with " + with);
+
         if (savedInstanceState != null) {
             CharSequence oldText = savedInstanceState.getCharSequence(STATE_1);
             currentText = oldText;

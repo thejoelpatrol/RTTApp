@@ -7,6 +7,7 @@ import android.view.View;
 
 public class IncomingCallActivity extends AppCompatActivity implements SessionListener {
     SipClient sipClient;
+    String from;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -14,11 +15,13 @@ public class IncomingCallActivity extends AppCompatActivity implements SessionLi
         setContentView(R.layout.activity_incoming_call);
         sipClient = SipClient.getInstance();
         sipClient.addSessionListener(this);
+        from = getIntent().getStringExtra("com.laserscorpion.rttapp.contact_uri");
+        setTitle("Call from " + from);
     }
 
     public void acceptCall(View view) {
         Intent intent = new Intent(this, RTTCallActivity.class);
-        //intent.putExtra("com.laserscorpion.rttapp.contact_uri", contact);
+        intent.putExtra("com.laserscorpion.rttapp.contact_uri", from);
         startActivity(intent);
         sipClient.acceptCall();
         close();
