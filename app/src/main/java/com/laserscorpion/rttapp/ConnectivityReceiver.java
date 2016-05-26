@@ -20,10 +20,11 @@ public class ConnectivityReceiver extends BroadcastReceiver {
     public void onReceive(final Context context, final Intent intent) {
         //if (BuildConfig.DEBUG) Log.d(TAG, "Received some kind of broadcast");
         if (intent.getAction().equals(ConnectivityManager.CONNECTIVITY_ACTION)) {
-            //if (BuildConfig.DEBUG) Log.d(TAG, "Received connectivity action");
+            if (BuildConfig.DEBUG) Log.d(TAG, "Received connectivity action");
             ConnectivityManager connMgr = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
             NetworkInfo networkInfo = connMgr.getActiveNetworkInfo();
-            if (networkInfo != null && networkInfo.isConnected())
+            NetworkInfo otherNetwork = intent.getParcelableExtra(ConnectivityManager.EXTRA_OTHER_NETWORK_INFO);
+            if (networkInfo != null && networkInfo.isConnected() && otherNetwork == null)
                 listener.IPAddrChanged();
         }
     }

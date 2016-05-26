@@ -1,7 +1,5 @@
 bugs
 
--sometimes registering freezes at a black screen
-	-this doesn't seem to happen any more…?
 -sometimes that JAIN SIP asynctask race condition is triggered in responding to OPTIONS 
 	- but who really cares?
 -excess BYEs seem to be sent by the server, but they don’t seem to cause any problems
@@ -18,7 +16,6 @@ bugs
 -Swype now seems to have a problem with replacing the last word in two steps?
 -observed a crash declining a call after receiving a DialogTerminated message, or maybe it was in responding to a second incoming call when one was already incoming?
 	-then after this crash, java.lang.IllegalStateException: Singleton SipClient has not been initialized yet - init() before getInstance()
--try connecting to a domain name, including a bad one
 
 UI deficiencies
 -so ugly

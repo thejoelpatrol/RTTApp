@@ -7,6 +7,8 @@ import android.javax.sip.message.Request;
 import android.os.AsyncTask;
 import android.util.Log;
 
+import java.net.UnknownHostException;
+
 /**
  * Used to fire a one-off request in a new thread then die
  */
@@ -29,6 +31,9 @@ public class SipRequester extends AsyncTask<Request, String, String> {
             Log.e(TAG, "the request still failed. UGH");
             Log.e(TAG, "requests[0] = " + requests[0].toString());
             e.printStackTrace();
+            if (e.getCause() != null) {
+                return e.getCause().getMessage();
+            }
             return null;
         }
     }

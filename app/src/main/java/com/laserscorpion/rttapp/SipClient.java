@@ -438,7 +438,7 @@ public class SipClient implements SipListener, IPChangeListener {
                 registrationPending = true;
             } else {
                 Log.e(TAG, "Failed to register: " + result);
-                sendControlMessage("Failed to send registration request. Check logcat");
+                sendControlMessage(result);
                 sendControlMessage("Not registered.");
             }
         } catch (SipException e) {
@@ -1068,6 +1068,7 @@ public class SipClient implements SipListener, IPChangeListener {
             if (BuildConfig.DEBUG) Log.d(TAG, "Resetting IP due to connectivity change, reregistering");
             if (BuildConfig.DEBUG) Log.d(TAG, "current IP: " + localIP);
             resetLocalIP();
+            if (BuildConfig.DEBUG) Log.d(TAG, "new IP: " + localIP);
             if (oldIP.equals(localIP)) {
                 // on at least one device, this appears to be called before the new IP is truly set
                 // so, here is a bad concurrency hack for Motorola's problem, not mine!
@@ -1079,7 +1080,6 @@ public class SipClient implements SipListener, IPChangeListener {
             }
             sendControlMessage("Network changed, reregistering");
             register();
-            if (BuildConfig.DEBUG) Log.d(TAG, "new IP: " + localIP);
         } catch (SipException e) {
             sendControlMessage("Error: troubling re-finding own IP ... connection possibly lost");
         }
