@@ -269,7 +269,14 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
     private void sendAppendedChars(CharSequence now, int start, int before, int count) {
         if (BuildConfig.DEBUG) Log.d(TAG, "chars appended");
         CharSequence added = now.subSequence(start + before, now.length());
-        texter.sendRTTChars(added.toString());
+        try {
+            texter.sendRTTChars(added.toString());
+        } catch  (IllegalStateException e) {
+            addText("Can't send text yet - call not connected\n");
+            makingManualEdit = true;
+            EditText edit = (EditText)findViewById(R.id.compose_message);
+            edit.setText(null);
+        }
     }
 
     /**

@@ -11,11 +11,11 @@ bugs
 -@todo Backspace handling in sending messages
 -doze/standby (this is a way future problem)
 -sipxcom often decides to send us 404 and 408, is this our fault? I doubt it
--sending text before the call is accepted is fatal
 -taking word suggestion of built-in keyboard popup is fatal - how to cause this to appear? i don't see that popup any more
 -Swype now seems to have a problem with replacing the last word in two steps?
 -observed a crash declining a call after receiving a DialogTerminated message, or maybe it was in responding to a second incoming call when one was already incoming?
 	-then after this crash, java.lang.IllegalStateException: Singleton SipClient has not been initialized yet - init() before getInstance()
+-need to unregister the connectivityreceiver
 
 UI deficiencies
 -so ugly

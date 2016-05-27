@@ -358,10 +358,6 @@ public class SipClient implements SipListener, IPChangeListener {
         if (!onACallNow())
             throw new IllegalStateException("no call connected, cannot send chars");
         currentCall.sendText(add);
-        /*for (TextListener listener : messageReceivers) {
-            listener.RTTextReceived(add);
-        }*/
-
     }
 
     private void notifySessionFailed(String reason) {
@@ -431,9 +427,9 @@ public class SipClient implements SipListener, IPChangeListener {
                 sendControlMessage("Failed to send registration request. Check logcat");
                 sendControlMessage("Not registered.");
             } else if (result.equals("Success")) {
-                // get() waits on the other thread
-                // we must wait for the request to send, but not for its response
-                // we (probably) aren't waiting long enough to lose the benefit of threading
+                // get() waits on the other thread that is sending the request
+                // doing this in another thread doesn't seem to make sense if we are waiting on get()
+                // maybe disable Android's strict mode to allow network on main thread?
                 sendControlMessage("Sent registration request");
                 registrationPending = true;
             } else {
@@ -489,10 +485,10 @@ public class SipClient implements SipListener, IPChangeListener {
             if (BuildConfig.DEBUG) Log.d(TAG, "555555555 should be 1:" + callLock.availablePermits());
             throw new TransactionUnavailableException("Can't call now -- already on a call");
         }
-        Address contact = addressFactory.createAddress("sip:" + URI);
-        int tag = randomGen.nextInt();
 
         try {
+            Address contact = addressFactory.createAddress("sip:" + URI);
+            int tag = randomGen.nextInt();
             ArrayList<ViaHeader> viaHeaders = createViaHeaders();
             CSeqHeader cSeqHeader = headerFactory.createCSeqHeader(1L, Request.INVITE);
             CallIdHeader callIdHeader = sipProvider.getNewCallId();
@@ -503,22 +499,27 @@ public class SipClient implements SipListener, IPChangeListener {
             request.addHeader(localContactHeader);
             ExpiresHeader expiresHeader = headerFactory.createExpiresHeader(CALL_RINGING_TIME);
             request.addHeader(expiresHeader);
-            request = (Request)SDPBuilder.addSDPContentAndHeader(request, 0, 0, port+1);
+            request = (Request) SDPBuilder.addSDPContentAndHeader(request, 0, 0, port + 1);
             SipRequester requester = new SipRequester(sipProvider);
             requester.execute(request);
             currentCall = new RTTCall(request, null, messageReceivers);
             currentCall.setCalling();
-            if (requester.get().equals("Success")) {
-                // get() waits on the other thread
-                // we must confirm the request sent, but no need to wait for its response
+            String result = requester.get();
+            if (result.equals("Success")) {
+                // get() waits on the other thread that is sending the request
+                // doing this in another thread doesn't seem to make sense if we are waiting on get()
+                // maybe disable Android's strict mode to allow network on main thread?
                 sendControlMessage("Sent INVITE request");
             } else {
-                callLock.release();
-                if (BuildConfig.DEBUG) Log.d(TAG, "6666666666 should be 1:" + callLock.availablePermits());
-                throw new SipException("async thread failed to send request");
+                throw new SipException(result);
             }
+        } catch (ParseException e){
+            callLock.release();
+            throw e;
         } catch (Exception e) {
             callLock.release();
+            currentCall.end();
+            currentCall = null;
             if (BuildConfig.DEBUG) Log.d(TAG, "777777777777 should be 1:" + callLock.availablePermits());
             e.printStackTrace();
             throw new SipException("couldn't send request; " + e.getMessage());
@@ -849,7 +850,7 @@ public class SipClient implements SipListener, IPChangeListener {
             //sendControlMessage("SIP OK");
             handleSuccess(responseEvent);
         } else {
-            if (responseCode == Response.RINGING) {
+            if (responseCode == Response.RINGING && currentCall != null && currentCall.isCalling()) {
                 sendControlMessage("Ringing...");
             }
             // maybe not do anything else for 1xx?

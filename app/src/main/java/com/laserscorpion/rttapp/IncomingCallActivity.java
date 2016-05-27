@@ -16,6 +16,8 @@ public class IncomingCallActivity extends AppCompatActivity implements SessionLi
         sipClient = SipClient.getInstance();
         sipClient.addSessionListener(this);
         from = getIntent().getStringExtra("com.laserscorpion.rttapp.contact_uri");
+        if (from.substring(0,4).equals("sip:"))
+            from = from.substring(4);
         setTitle("Call from " + from);
     }
 

@@ -132,18 +132,18 @@ public class RTTRegistrationActivity extends AppCompatActivity implements TextLi
             addText("Error: enter an address to call\n");
             return;
         }
-        Intent intent = new Intent(this, RTTCallActivity.class);
-        intent.putExtra("com.laserscorpion.rttapp.contact_uri", contact);
-        startActivity(intent);
         //texter.call(contact);
         try {
             texter.call(contact);
+            Intent intent = new Intent(this, RTTCallActivity.class);
+            intent.putExtra("com.laserscorpion.rttapp.contact_uri", contact);
+            startActivity(intent);
         } catch (ParseException e) {
-            addText("Invalid contact address: " + contact);
+            addText("Invalid contact address: " + contact + "\n");
         } catch (TransactionUnavailableException e) {
-            addText("Can't call right now - SIP stack busy");
+            addText("Can't call right now - SIP stack busy\n");
         } catch (android.javax.sip.SipException e) {
-            addText("Call failed: " + e.getMessage());
+            addText("Call failed: " + e.getMessage() + "\n");
         }
     }
 
