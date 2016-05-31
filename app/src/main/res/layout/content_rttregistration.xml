@@ -23,13 +23,13 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:hint="Contact Name"/>
+            android:hint="Contact Address"/>
         <Button
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_alignParentTop="true"
             android:layout_toRightOf="@id/contact_name"
-            android:text="Connect"
+            android:text="Call"
             android:onClick="call" />
     </LinearLayout>
         <TextView

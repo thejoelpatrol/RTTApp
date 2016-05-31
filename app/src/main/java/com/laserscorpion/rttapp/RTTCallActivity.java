@@ -96,18 +96,17 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
         final CleanString toAdd = countAndRemoveBackspaces(text);
         final CharSequence existing;
 
+        CharSequence textWithNoFEFF = cleanText(view.getText());
         if (toAdd.backspaces > 0) {
-            CharSequence textWithNoFEFF = cleanText(view.getText());
             int newlen = Math.max(0, textWithNoFEFF.length() - toAdd.backspaces);
             existing = textWithNoFEFF.subSequence(0, newlen);
         } else
-            existing = view.getText();
+           existing = textWithNoFEFF;
 
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                if (toAdd.backspaces > 0)
-                    view.setText(existing);
+                view.setText(existing);
                 view.append(toAdd.str);
             }
         });
@@ -119,7 +118,7 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
      * space. These Google devs don't care and use this invisible character to save having to edit
      * the string sometimes, when a char is deleted at the end. What, do they think that no one will
      * ever notice that charSequence.length() != actualRealUsefulCharacters.length()? Why don't they
-     * use a null char? I say this is a pure bug in CharSequence.
+     * just use a null char? I say this is a pure bug in CharSequence. Use null!
      * @param dirty the characters that stupidly end with some number of \uFEFF chars
      * @return the normal sensible part of this text
      */
@@ -130,7 +129,12 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
                 badChars++;
             else break;
         }
-        return dirty.subSequence(0, dirty.length() - badChars);
+        if (badChars > 0) {
+            Log.d(TAG, "len: " + dirty.length() + " bad: " + badChars + " - " + dirty);
+            return dirty.subSequence(0, dirty.length() - badChars);
+        } else
+            return dirty;
+
     }
 
     /**
@@ -166,6 +170,7 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
         else
             clean.backspaces = initialBS;
         if (BuildConfig.DEBUG) Log.d(TAG, "bs: " + clean.backspaces);
+        if (BuildConfig.DEBUG) Log.d(TAG, "adding: " + clean.str);
         return clean;
     }
 
@@ -247,14 +252,44 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
                 sendCompoundReplacementText(s, start, before, count);
             }
         } else {
-            if (BuildConfig.DEBUG) Log.d(TAG, "Some kind of complex edit occurred 2");
-            needManualEdit = true;
-            // we can't allow edits that occur earlier in the text, you can only edit the end
+            if (editInLastWord(start, before, count)) {
+                if (BuildConfig.DEBUG) Log.d(TAG, "edit in last word");
+                sendLastWord(s, start, before, count);
+            } else {
+                if (BuildConfig.DEBUG) Log.d(TAG, "Some kind of complex edit occurred 2");
+                needManualEdit = true;
+                // we can't allow edits that occur earlier in the text, you can only edit the end
+            }
         }
-        previousEdit = new Edit();
+        /*previousEdit = new Edit();
         previousEdit.start = start;
         previousEdit.before = before;
-        previousEdit.count = count;
+        previousEdit.count = count;*/
+    }
+
+    private void sendLastWord(CharSequence now, int start, int before, int count) {
+        int len = currentText.length() - lastWordStart(currentText);
+        sendBackspaces(len);
+        int newLen = now.length() - lastWordStart(currentText);
+
+        CharSequence add = now.subSequence(now.length() - newLen, now.length());
+        texter.sendRTTChars(add.toString());
+    }
+
+    private boolean editInLastWord(int start, int before, int count) {
+        if (start >= lastWordStart(currentText))
+            return true;
+        return false;
+    }
+
+    private int lastWordStart(CharSequence text) {
+        int i = text.length() - 1;
+        for (; i >= 0; i--) {
+            char c = text.charAt(i);
+            if (Character.isWhitespace(c))
+                break;
+        }
+        return i + 1;
     }
 
     private void sendBackspaces(int howMany) {
@@ -283,12 +318,14 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
      * Precondition: charsOnlyDeleted()
      */
     private void sendDeletionsFromEnd(CharSequence now, int start, int before, int count) {
-        Log.d(TAG, "chars deleted from end");
+        Log.d(TAG, "chars deleted from end - " + start + " - " + before + " - " + count);
         sendBackspaces(before - count);
-        if (previousEdit != null && previousEdit.start == start && previousEdit.count == 0) {
+        /*if (previousEdit != null && previousEdit.start == start && previousEdit.count == 0) {
             // this is the case where the last word has been deleted in two steps by the keyboard, i.e. the cursor is in the middle of the word and it is replaced
             sendBackspaces(previousEdit.before);
-        }
+
+            // this is no longer necessary - we now handle editing the last word all at once
+        }*/
     }
 
     /**
