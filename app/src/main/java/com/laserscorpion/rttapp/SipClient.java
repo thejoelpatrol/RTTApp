@@ -537,6 +537,8 @@ public class SipClient implements SipListener, IPChangeListener {
         Request request = requestEvent.getRequest();
         Log.d(TAG, "received a request: " + request.getMethod());
         Log.d(TAG, request.toString().substring(0, 100));
+        if (!isForUs(requestEvent))
+            return;
         switch (request.getMethod()) {
             case Request.OPTIONS:
                 sendOptions(requestEvent);
@@ -701,10 +703,6 @@ public class SipClient implements SipListener, IPChangeListener {
     }
 
     private void receiveCall(RequestEvent requestEvent) {
-        if (callForSomeoneElse(requestEvent)) {
-            if (BuildConfig.DEBUG) Log.d(TAG, "Call is not for us, ignoring.");
-            return;
-        }
         boolean lockAvailable = callLock.tryAcquire();
         if (lockAvailable && !onACallNow()) {
             if (BuildConfig.DEBUG) Log.d(TAG, "just acquired the lock - permits remaining: " + callLock.availablePermits());
@@ -737,33 +735,36 @@ public class SipClient implements SipListener, IPChangeListener {
     }
 
     /**
-     * Is this incoming call even for us, according to its To: header? Or is it just some mass
+     * Is this incoming request even for us, according to its To: header? Or is it just some mass
      * scan that is checking us out and should be ignored?
-     * @param requestEvent incoming call
-     * @return definitely returns false if we know this call is for us. Definitively returns true
+     * @param requestEvent incoming request
+     * @return definitely returns true if we know this is for us. Definitively returns false
      * if we can tell the call is for somebody else. If we can't tell due to some error, also returns
-     * true
+     * false
      */
-    private boolean callForSomeoneElse(RequestEvent requestEvent) {
+    private boolean isForUs(RequestEvent requestEvent) {
         Request request = requestEvent.getRequest();
         ToHeader toHeader = (ToHeader)request.getHeader("To");
+        if (toHeader == null)
+            return false; // should actually return a 400 here, but whatever, just ignore it
         Address to = toHeader.getAddress();
         try {
             Address us = addressFactory.createAddress("sip:" + username + "@" + server);
             if (to.equals(us))
-                return false;
+                return true;
             us = addressFactory.createAddress("sip:" + username + "@" + localIP);
             if (to.equals(us))
-                return false;
+                return true;
             us = addressFactory.createAddress("sip:" + username + "@" + localIP + ":" + port);
             if (to.equals(us))
-                return false;
+                return true;
         } catch (ParseException e) {
             if (BuildConfig.DEBUG) Log.d(TAG, "Unable to check address - assuming it is not for us");
             //e.printStackTrace();
         }
-        return true;
+        return false;
     }
+
 
     private void cancelCall(RequestEvent requestEvent) {
         if (currentCall.isRinging() && cancelApplies(requestEvent, currentCall)) {

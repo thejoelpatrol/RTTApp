@@ -16,6 +16,8 @@ bugs
 -observed a crash declining a call after receiving a DialogTerminated message, or maybe it was in responding to a second incoming call when one was already incoming?
 	-then after this crash, java.lang.IllegalStateException: Singleton SipClient has not been initialized yet - init() before getInstance()
 -need to unregister the connectivityreceiver
+-occasional text deletion problem that leaves too many chars intact? very hard to trigger
+-trying to send a payload more than 512 chars crashes RtpTextTransmitter (this includes redundant packets with multiple messages)
 
 UI deficiencies
 -so ugly
@@ -24,6 +26,7 @@ UI deficiencies
 -entire RegistrationActivity should be replaced with phone book or recent calls or something
 -make sure app continues running in bg - consider adding a service?
 -should vibrate on incoming call
+-separate control message view from conversation
 
 Other limitations
 -NAT
