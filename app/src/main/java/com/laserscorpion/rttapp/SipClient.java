@@ -311,9 +311,11 @@ public class SipClient implements SipListener, IPChangeListener {
      *                    text output will not be processed by anyone.
      */
     public synchronized void addTextReceiver(TextListener newReceiver) {
-        if (messageReceivers.contains(newReceiver))
-            return;
-        messageReceivers.add(newReceiver);
+        synchronized (messageReceivers) {
+            if (messageReceivers.contains(newReceiver))
+                return;
+            messageReceivers.add(newReceiver);
+        }
         notify();
     }
 
@@ -332,8 +334,10 @@ public class SipClient implements SipListener, IPChangeListener {
      * @param receiver the TextReceiver that should no longer receive text messages
      */
     public void removeTextReceiver(TextListener receiver) {
-        if (messageReceivers.contains(receiver))
-            messageReceivers.remove(receiver);
+        synchronized (messageReceivers) {
+            if (messageReceivers.contains(receiver))
+                messageReceivers.remove(receiver);
+        }
     }
 
     public void addSessionListener(SessionListener newListener) {
@@ -345,12 +349,16 @@ public class SipClient implements SipListener, IPChangeListener {
         }
     }
     public void removeSessionListener(SessionListener existingListener) {
-        if (sessionReceivers.contains(existingListener))
-            sessionReceivers.remove(existingListener);
+        synchronized (sessionReceivers) {
+            if (sessionReceivers.contains(existingListener))
+                sessionReceivers.remove(existingListener);
+        }
     }
     private void sendControlMessage(String message) {
-        for (TextListener listener : messageReceivers) {
-            listener.ControlMessageReceived(message);
+        synchronized (messageReceivers) {
+            for (TextListener listener : messageReceivers) {
+                listener.ControlMessageReceived(message);
+            }
         }
     }
 

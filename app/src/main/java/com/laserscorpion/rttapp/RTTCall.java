@@ -411,9 +411,11 @@ public class RTTCall {
                     received = buffer.getData(); // this blocks until there is something in the fifo
                     if (received != null) {
                         synchronized (parent) {
-                            for (TextListener receiver : messageReceivers) {
-                                String text = new String(received, StandardCharsets.UTF_8);
-                                receiver.RTTextReceived(text);
+                            synchronized (messageReceivers) {
+                                for (TextListener receiver : messageReceivers) {
+                                    String text = new String(received, StandardCharsets.UTF_8);
+                                    receiver.RTTextReceived(text);
+                                }
                             }
                         }
                     }
