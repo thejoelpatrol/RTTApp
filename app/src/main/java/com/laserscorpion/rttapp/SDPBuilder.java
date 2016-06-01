@@ -1,6 +1,8 @@
 package com.laserscorpion.rttapp;
 
+import android.gov.nist.core.Host;
 import android.gov.nist.javax.sdp.fields.AttributeField;
+import android.gov.nist.javax.sdp.fields.ConnectionField;
 import android.javax.sdp.Attribute;
 import android.javax.sdp.Connection;
 import android.javax.sdp.Media;
@@ -8,6 +10,7 @@ import android.javax.sdp.MediaDescription;
 import android.javax.sdp.Origin;
 import android.javax.sdp.SdpException;
 import android.javax.sdp.SdpFactory;
+import android.javax.sdp.SdpParseException;
 import android.javax.sdp.SessionDescription;
 import android.javax.sip.PeerUnavailableException;
 import android.javax.sip.SipFactory;
@@ -34,6 +37,7 @@ public class SDPBuilder {
         public String localIP;
         public int port;
     }
+
     private static final String TAG = "SDPBuilder";
     private static final int SAMPLE_RATE = 1000; // defined by RFC 4103 p.15
     private static SdpFactory factory = SdpFactory.getInstance();
@@ -41,20 +45,22 @@ public class SDPBuilder {
     private static HeaderFactory headerFactory;
     private static SecureRandom randomGen = new SecureRandom();
     private static boolean useDummyAudio = true;
+
     public enum mediaType {T140, T140RED}
 
     /**
      * Creates a copy of message and adds SDP content and header for RTT, according to the other params.
-     * @param message the message-in-progress that needs the SDP added. This message MUST already contain
-     *                a Contact header that specifies the SIP user and local IP sending this message. It will
-     *                likely throw a NPE if not present.
+     *
+     * @param message          the message-in-progress that needs the SDP added. This message MUST already contain
+     *                         a Contact header that specifies the SIP user and local IP sending this message. It will
+     *                         likely throw a NPE if not present.
      * @param preferredT140Map if this is a response to a request that proposed a T140 rtpmap, use that.
      *                         Otherwise, use 0 for the default rtpmap num
-     * @param preferredRedMap if this is a response to a request that proposed a T140red rtpmap, use that.
+     * @param preferredRedMap  if this is a response to a request that proposed a T140red rtpmap, use that.
      *                         Otherwise:
-     *                              -Use 0 for the default T140red rtpmap num
-     *                              -Use -1 to not use redundancy at all
-     * @param port the local UDP port where the other party should send RTT
+     *                         -Use 0 for the default T140red rtpmap num
+     *                         -Use -1 to not use redundancy at all
+     * @param port             the local UDP port where the other party should send RTT
      * @return a new copy of the message with the SDP added
      */
     public static Message addSDPContentAndHeader(Message message, int preferredT140Map, int preferredRedMap, int port) {
@@ -65,9 +71,9 @@ public class SDPBuilder {
                 Log.e(TAG, "Probably about to get an NPE ... couldn't get headerFactory", e);
             }
         }
-        Message newMessage = (Message)message.clone();
-        ContactHeader contact = (ContactHeader)newMessage.getHeader("Contact");
-        SipURI from = (SipURI)contact.getAddress().getURI();
+        Message newMessage = (Message) message.clone();
+        ContactHeader contact = (ContactHeader) newMessage.getHeader("Contact");
+        SipURI from = (SipURI) contact.getAddress().getURI();
         Sender sender = new Sender();
         sender.username = from.getUser();
         sender.localIP = from.getHost();
@@ -89,9 +95,8 @@ public class SDPBuilder {
 
 
     /**
-     *
      * @param t140MapNum the preferred map number for the red media type, or 0 for no preference
-     * @param redMapNum the preferred map number for the red media type, or 0 for no preference, or -1 for no redundancy
+     * @param redMapNum  the preferred map number for the red media type, or 0 for no preference, or -1 for no redundancy
      * @return
      */
     private static String createRTTSDPContent(int t140MapNum, int redMapNum, Sender sender) {
@@ -101,7 +106,8 @@ public class SDPBuilder {
         if (redMapNum == 0)
             redMapNum = 101;
         try {
-            int codecs[] = {t140MapNum};;
+            int codecs[] = {t140MapNum};
+            ;
             if (redMapNum > 0) {
                 codecs = new int[2];
                 codecs[0] = t140MapNum;
@@ -153,6 +159,7 @@ public class SDPBuilder {
      * we're not actually going to send or receive audio. we are setting up a dummy audio stream
      * so as to work with Asterisk, which assumes there must always be at least one audio stream
      * on any type of call.
+     *
      * @param preferredMapNum if we have received a proposed session, use the other party's suggested
      *                        audio map number. If not, i.e. we are proposing a session, use -1
      * @param preferredFormat if we have received a proposed session, use the other party's suggested
@@ -203,6 +210,7 @@ public class SDPBuilder {
             }
             return -1;
         } catch (Exception e) {
+            Log.e(TAG, "call media may fail, couldn't get T140 rtpmap from SDP");
             e.printStackTrace();
             return -1;
         }
@@ -222,10 +230,23 @@ public class SDPBuilder {
             }
             return 0;
         } catch (Exception e) {
+            Log.e(TAG, "call media may fail, couldn't get T140 port from SDP");
             e.printStackTrace();
             return 0;
         }
     }
 
-
+    public static String getRemoteIP(Message otherPartySDP) {
+        String body = new String(otherPartySDP.getRawContent(), StandardCharsets.UTF_8);
+        try {
+            SessionDescription suggestedSession = factory.createSessionDescription(body);
+            ConnectionField connection = (ConnectionField) suggestedSession.getConnection();
+            Host host = connection.getConnectionAddress().getAddress();
+            return host.getAddress();
+        } catch (SdpParseException e) {
+            Log.e(TAG, "app may crash/call may fail, couldn't get IP from SDP");
+            e.printStackTrace();
+            return null;
+        }
+    }
 }

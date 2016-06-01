@@ -26,6 +26,7 @@ UI deficiencies
 -make sure app continues running in bg - consider adding a service?
 -should vibrate on incoming call
 -separate control message view from conversation
+-use display name, not just sip uri
 
 Other limitations
 -NAT

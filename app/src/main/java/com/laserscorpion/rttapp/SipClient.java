@@ -564,7 +564,7 @@ public class SipClient implements SipListener, IPChangeListener {
                     int suggestedT140Map = SDPBuilder.getT140MapNum(originalInvite, SDPBuilder.mediaType.T140);
                     int suggestedT140RedMap = SDPBuilder.getT140MapNum(originalInvite, SDPBuilder.mediaType.T140RED);
                     try {
-                        currentCall.accept(getContactIP(originalInvite), SDPBuilder.getT140PortNum(originalInvite), port+1, suggestedT140Map, suggestedT140RedMap);
+                        currentCall.accept(SDPBuilder.getRemoteIP(originalInvite), SDPBuilder.getT140PortNum(originalInvite), port+1, suggestedT140Map, suggestedT140RedMap);
                         currentCall.addDialog(requestEvent.getDialog());
                         synchronized (this) {
                             try {
@@ -978,7 +978,7 @@ public class SipClient implements SipListener, IPChangeListener {
             int agreedT140MapNum = SDPBuilder.getT140MapNum(response, SDPBuilder.mediaType.T140);
             int agreedT140RedMapNum = SDPBuilder.getT140MapNum(response, SDPBuilder.mediaType.T140RED);
             try {
-                currentCall.callAccepted(getContactIP(response), SDPBuilder.getT140PortNum(response), port+1, agreedT140MapNum, agreedT140RedMapNum);
+                currentCall.callAccepted(SDPBuilder.getRemoteIP(response), SDPBuilder.getT140PortNum(response), port + 1, agreedT140MapNum, agreedT140RedMapNum);
                 notifySessionEstablished();
             } catch (RtpException e) {
                 // TODO: throw up a dialog explaining call failure
