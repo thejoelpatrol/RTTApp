@@ -17,7 +17,6 @@ bugs
 -need to unregister the connectivityreceiver
 -occasional text deletion problem that leaves too many chars intact? very hard to trigger, POSSIBLY fixed by removing \uFEFF from text upon every addition
 -trying to send a payload more than 512 chars crashes RtpTextTransmitter (this includes redundant packets with multiple messages)
--need to send CANCEL when hanging up an unconnected call
 
 UI deficiencies
 -so ugly

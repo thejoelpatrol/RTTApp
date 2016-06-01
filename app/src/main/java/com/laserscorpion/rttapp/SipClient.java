@@ -500,9 +500,11 @@ public class SipClient implements SipListener, IPChangeListener {
             ExpiresHeader expiresHeader = headerFactory.createExpiresHeader(CALL_RINGING_TIME);
             request.addHeader(expiresHeader);
             request = (Request) SDPBuilder.addSDPContentAndHeader(request, 0, 0, port + 1);
-            SipRequester requester = new SipRequester(sipProvider);
-            requester.execute(request);
+            ClientTransaction transaction = sipProvider.getNewClientTransaction(request);
+            SipTransactionRequester requester = new SipTransactionRequester(sipProvider);
+            requester.execute(transaction);
             currentCall = new RTTCall(request, null, messageReceivers);
+            currentCall.addInviteTransaction(transaction);
             currentCall.setCalling();
             String result = requester.get();
             if (result.equals("Success")) {
@@ -537,8 +539,10 @@ public class SipClient implements SipListener, IPChangeListener {
         Request request = requestEvent.getRequest();
         Log.d(TAG, "received a request: " + request.getMethod());
         Log.d(TAG, request.toString().substring(0, 100));
-        if (!isForUs(requestEvent))
+        if (!isForUs(requestEvent)) {
+            Log.d(TAG, "not for us, ignoring");
             return;
+        }
         switch (request.getMethod()) {
             case Request.OPTIONS:
                 sendOptions(requestEvent);
@@ -917,6 +921,8 @@ public class SipClient implements SipListener, IPChangeListener {
         AuthenticationHelper authenticator = stack.getAuthenticationHelper(manager, headerFactory);
         try {
             ClientTransaction transaction = authenticator.handleChallenge(responseEvent.getResponse(), origTransaction, sipProvider, 10);
+            if (isInviteResponse(responseEvent))
+                currentCall.addInviteTransaction(transaction);
             SipTransactionRequester requester = new SipTransactionRequester(sipProvider);
             Log.d(TAG, "Sending credentials in response to challenge");
             requester.execute(transaction);
@@ -1020,8 +1026,18 @@ public class SipClient implements SipListener, IPChangeListener {
     }
 
     private void sendCancel() {
-        // TODO implement this, which is probably nontrivial
-        Log.d(TAG, "(Not actually) sending CANCEL");
+        Log.d(TAG, "sending CANCEL");
+        ClientTransaction transaction = currentCall.getInviteClientTransaction();
+        try {
+            Request cancelRequest = transaction.createCancel();
+            ClientTransaction cancelTransaction = sipProvider.getNewClientTransaction(cancelRequest);
+            SipTransactionRequester requester = new SipTransactionRequester(sipProvider);
+            requester.execute(cancelTransaction);
+        } catch (SipException e) {
+            sendControlMessage("Failed to send cancel! Check logcat!");
+            e.printStackTrace();
+        }
+
     }
 
     @Override

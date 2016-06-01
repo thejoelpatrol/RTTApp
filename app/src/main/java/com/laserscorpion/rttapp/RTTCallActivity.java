@@ -106,10 +106,18 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                view.setText(existing);
-                view.append(toAdd.str);
+                synchronized (view) {
+                    view.setText(existing);
+                    view.append(toAdd.str);
+                    view.notify();
+                }
             }
         });
+        synchronized (view) {
+            try {
+                view.wait(1000);
+            } catch (InterruptedException e) {}
+        }
     }
 
     /**

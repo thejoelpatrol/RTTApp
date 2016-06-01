@@ -1,5 +1,6 @@
 package com.laserscorpion.rttapp;
 
+import android.javax.sip.ClientTransaction;
 import android.javax.sip.Dialog;
 import android.javax.sip.RequestEvent;
 import android.javax.sip.ServerTransaction;
@@ -48,6 +49,7 @@ public class RTTCall {
     private SipClient sipClient;
     private Dialog dialog;
     private Request creationRequest;
+    private ClientTransaction inviteClientTransaction;
 
     private RequestEvent incomingRequest;
     private ServerTransaction inviteTransaction;
@@ -128,6 +130,15 @@ public class RTTCall {
     }
 
     /**
+     *
+     * @return the transaction used to send the original INVITE, or null if none
+     */
+    public ClientTransaction getInviteClientTransaction() {
+        return inviteClientTransaction;
+    }
+
+
+    /**
      * Used to change the Dialog associated with the call, especially if one was not
      * available at creation of the RTTCall
      * @param dialog the new Dialog to associate with the call
@@ -135,6 +146,16 @@ public class RTTCall {
     public synchronized void addDialog(Dialog dialog) {
         this.dialog = dialog;
     }
+
+    /**
+     * Used to change the ClientTransaction that was used to send the original INVITE request
+     * e.g. when sending that INVITE, or when sending another INVITE after authenticating
+     * @param transaction the new ClientTransaction to associate with the call
+     */
+    public synchronized void addInviteTransaction(ClientTransaction transaction) {
+        this.inviteClientTransaction = transaction;
+    }
+
 
     public synchronized void resetMessageReceivers(List<TextListener> messageReceivers) {
        this.messageReceivers = messageReceivers;
