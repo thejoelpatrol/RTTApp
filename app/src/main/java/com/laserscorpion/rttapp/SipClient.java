@@ -44,6 +44,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Properties;
+import java.util.TooManyListenersException;
 import java.util.Vector;
 import java.util.concurrent.Semaphore;
 
@@ -89,6 +90,7 @@ public class SipClient implements SipListener, IPChangeListener {
     private List<SessionListener> sessionReceivers;
     private CallReceiver callReceiver;
     private SecureRandom randomGen;
+    private ConnectivityReceiver connectivityReceiver;
     private boolean registrationPending = false;
 
     /*  callLock has a fairly normal purpose: it must be held whenever making a change
@@ -134,8 +136,9 @@ public class SipClient implements SipListener, IPChangeListener {
         sessionReceivers = new LinkedList<SessionListener>();
         randomGen = new SecureRandom();
         callLock = new Semaphore(1);
+        connectivityReceiver = new ConnectivityReceiver(this);
 
-        parent.registerReceiver(new ConnectivityReceiver(this), new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION));
+        parent.registerReceiver(connectivityReceiver, new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION));
         //callDestructionLock = new Semaphore(1);
         //allowed_methods = TextUtils.join(", ", ALLOWED_METHODS);
         finishInit();
@@ -171,6 +174,7 @@ public class SipClient implements SipListener, IPChangeListener {
     }
 
     private void openListeningPoint() throws SipException {
+        //Log.d(TAG, "openListeningPoint()");
         while (listeningPoint == null) {
             try {
                 listeningPoint = sipStack.createListeningPoint(localIP, port, protocol); // a ListeningPoint is a socket wrapper
@@ -225,11 +229,18 @@ public class SipClient implements SipListener, IPChangeListener {
         Address newGlobalSipAddress = null;
         Address localSipAddress = null;
         try {
+            openListeningPoint();
             newGlobalSipAddress = addressFactory.createAddress("sip:" + username + "@" + server);
             localSipAddress = addressFactory.createAddress("sip:" + username + "@" + localIP + ":" + listeningPoint.getPort());
             localContactHeader = headerFactory.createContactHeader(localSipAddress);
+            sipProvider.addSipListener(this);
+            sipProvider.addListeningPoint(listeningPoint);
+            parent.registerReceiver(connectivityReceiver, new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION));
         } catch (ParseException e) {
             throw new SipException("Error: could not parse new account parameters");
+        } catch (TooManyListenersException e) {
+            e.printStackTrace();
+            throw new SipException("Error: too many listeners, must not have unregistered with the sipProvider via close()", e);
         }
         this.parent = context;
         this.username = username;
@@ -472,11 +483,22 @@ public class SipClient implements SipListener, IPChangeListener {
         }
     }
 
+    @Override
+    public void finalize() {
+        close();
+    }
+
+    /**
+     * This must be called when the SipClient is done and will not be used again, to close ports
+     * and delete broadcast receivers.
+     */
     public void close() {
         try {
             sipProvider.removeListeningPoint(listeningPoint);
             sipProvider.removeSipListener(this);
+            parent.unregisterReceiver(connectivityReceiver);
             sipStack.deleteListeningPoint(listeningPoint);
+            listeningPoint = null;
             Log.d(TAG, "deleted listening point");
         } catch (ObjectInUseException e) {
             // TODO handle this

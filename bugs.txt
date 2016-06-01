@@ -14,9 +14,9 @@ bugs
 -taking word suggestion of built-in keyboard popup is fatal - how to cause this to appear? i don't see that popup any more
 -observed a crash declining a call after receiving a DialogTerminated message, or maybe it was in responding to a second incoming call when one was already incoming?
 	-then after this crash, java.lang.IllegalStateException: Singleton SipClient has not been initialized yet - init() before getInstance()
--need to unregister the connectivityreceiver
 -occasional text deletion problem that leaves too many chars intact? very hard to trigger, POSSIBLY fixed by removing \uFEFF from text upon every addition
 -trying to send a payload more than 512 chars crashes RtpTextTransmitter (this includes redundant packets with multiple messages)
+-handle in-dialog INVITEs
 
 UI deficiencies
 -so ugly
