@@ -10,16 +10,19 @@ import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.EditText;
+import android.widget.TextView;
 
 public class FirstActivity extends AppCompatActivity {
     public static final String EXTRA_MESSAGE = "com.laserscorpion.rttapp.MESSAGE";
     public static final String TAG = "RTTApp";
     private String REGISTRAR_PREF_NAME; // these are basically constants
+    private String SIP_USER_PREF_NAME;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         REGISTRAR_PREF_NAME = getString(R.string.pref_registrar_qualified);
+        SIP_USER_PREF_NAME = getString(R.string.pref_username_qualified);
 
         setContentView(R.layout.activity_first);
         PreferenceManager.setDefaultValues(this, R.xml.preferences, true);
@@ -32,6 +35,8 @@ public class FirstActivity extends AppCompatActivity {
         super.onStart();
         EditText serverField = (EditText)findViewById(R.id.server_addr);
         serverField.setText(getRegistrar());
+        TextView user = (TextView)findViewById(R.id.sip_username);
+        user.setText(getUsername() + "@");
     }
 
     @Override
@@ -42,6 +47,11 @@ public class FirstActivity extends AppCompatActivity {
     private String getRegistrar() {
         SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(this);
         return pref.getString(REGISTRAR_PREF_NAME, "fail");
+    }
+
+    private String getUsername() {
+        SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(this);
+        return pref.getString(SIP_USER_PREF_NAME, "fail");
     }
 
     public void register(View view) {

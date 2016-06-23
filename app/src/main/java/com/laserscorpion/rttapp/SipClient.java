@@ -46,6 +46,7 @@ import java.util.ListIterator;
 import java.util.Properties;
 import java.util.TooManyListenersException;
 import java.util.Vector;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Semaphore;
 
 import android.gov.nist.javax.sip.SipStackExt;
@@ -510,7 +511,7 @@ public class SipClient implements SipListener, IPChangeListener {
         }*/
     }
 
-    public void call(String URI) throws SipException, ParseException, TransactionUnavailableException {
+    public void call(String URI) throws SipException, ParseException, TransactionUnavailableException, InterruptedException, ExecutionException, InvalidArgumentException {
         boolean available = callLock.tryAcquire();
         if (!available)
             throw new TransactionUnavailableException("Can't call now -- already modifying call state");
@@ -534,7 +535,16 @@ public class SipClient implements SipListener, IPChangeListener {
             ExpiresHeader expiresHeader = headerFactory.createExpiresHeader(CALL_RINGING_TIME);
             request.addHeader(expiresHeader);
             request = (Request) SDPBuilder.addSDPContentAndHeader(request, 0, 0, port + 1);
-            ClientTransaction transaction = sipProvider.getNewClientTransaction(request);
+            StrictMode.ThreadPolicy tp0 = StrictMode.getThreadPolicy();
+            ClientTransaction transaction;
+            try {
+                StrictMode.setThreadPolicy(StrictMode.ThreadPolicy.LAX);
+                transaction = sipProvider.getNewClientTransaction(request);
+            } catch (TransactionUnavailableException e) {
+                throw new ParseException("couldn't find contact's server", 0);
+            } finally {
+                StrictMode.setThreadPolicy(tp0);
+            }
             SipTransactionRequester requester = new SipTransactionRequester(sipProvider);
             requester.execute(transaction);
             currentCall = new RTTCall(request, null, messageReceivers);
@@ -549,16 +559,16 @@ public class SipClient implements SipListener, IPChangeListener {
             } else {
                 throw new SipException(result);
             }
-        } catch (ParseException e){
-            callLock.release();
-            throw e;
         } catch (Exception e) {
             callLock.release();
-            currentCall.end();
+            if (currentCall != null)
+                currentCall.end();
             currentCall = null;
             if (BuildConfig.DEBUG) Log.d(TAG, "777777777777 should be 1:" + callLock.availablePermits());
             e.printStackTrace();
-            throw new SipException("couldn't send request; " + e.getMessage());
+            if (e instanceof ParseException || e instanceof TransactionUnavailableException)
+                throw e;
+            throw new SipException("couldn't send request; ", e);
         }
     }
 

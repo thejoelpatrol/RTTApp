@@ -13,9 +13,19 @@
     tools:context=".FirstActivity"
     tools:showIn="@layout/activity_first">
 
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="You may change your username under settings.
+        \nHere you specify the registrar/server, since it may not have a static IP."/>
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
+        <TextView
+            android:id="@+id/sip_username"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="username@"/>
         <EditText
             android:id="@+id/server_addr"
             android:layout_width="0dp"

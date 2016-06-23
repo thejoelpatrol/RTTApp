@@ -139,10 +139,10 @@ public class RTTRegistrationActivity extends AppCompatActivity implements TextLi
             intent.putExtra("com.laserscorpion.rttapp.contact_uri", contact);
             startActivity(intent);
         } catch (ParseException e) {
-            addText("Invalid contact address: " + contact + "\n");
+            addText("Bad contact address: " + contact + " (" + e.getMessage() + ")\n");
         } catch (TransactionUnavailableException e) {
-            addText("Can't call right now - SIP stack busy\n");
-        } catch (android.javax.sip.SipException e) {
+            addText(e.getMessage() + "\n");
+        } catch (Exception e) {
             addText("Call failed: " + e.getMessage() + "\n");
         }
     }
