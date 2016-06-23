@@ -225,6 +225,10 @@ public class SipClient implements SipListener, IPChangeListener {
     }
 
     public synchronized void reset(Context context, String username, String server, String password, TextListener listener) throws SipException {
+        this.parent = context;
+        this.username = username;
+        this.server = server;
+        this.password = password;
         resetLocalIP();
         Address newGlobalSipAddress = null;
         Address localSipAddress = null;
@@ -242,10 +246,6 @@ public class SipClient implements SipListener, IPChangeListener {
             e.printStackTrace();
             throw new SipException("Error: too many listeners, must not have unregistered with the sipProvider via close()", e);
         }
-        this.parent = context;
-        this.username = username;
-        this.server = server;
-        this.password = password;
         globalSipAddress = newGlobalSipAddress;
         messageReceivers = new ArrayList<TextListener>();
         addTextReceiver(listener);
@@ -496,14 +496,18 @@ public class SipClient implements SipListener, IPChangeListener {
         try {
             sipProvider.removeListeningPoint(listeningPoint);
             sipProvider.removeSipListener(this);
-            parent.unregisterReceiver(connectivityReceiver);
             sipStack.deleteListeningPoint(listeningPoint);
             listeningPoint = null;
             Log.d(TAG, "deleted listening point");
+            parent.unregisterReceiver(connectivityReceiver);
         } catch (ObjectInUseException e) {
             // TODO handle this
             e.printStackTrace();
-        }
+        } /*catch (IllegalArgumentException e) {
+            // TODO why?!
+            Log.e(TAG, "connectivityReceiver not registered?!");
+            e.printStackTrace();
+        }*/
     }
 
     public void call(String URI) throws SipException, ParseException, TransactionUnavailableException {
