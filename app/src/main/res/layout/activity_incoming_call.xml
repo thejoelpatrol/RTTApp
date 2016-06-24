@@ -15,18 +15,28 @@
         android:layout_height="wrap_content">
         <Button
             android:id="@+id/declineButton"
+            android:layout_weight=".5"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_alignParentTop="true"
             android:text="Decline"
-            android:onClick="declineCall" />
+            android:drawableRight="@drawable/ic_call_end_white_48dp"
+            android:onClick="declineCall"
+            android:background="@drawable/button_red"
+            android:textColor="#ffffff"
+            android:textSize="24dp"/>
         <Button
             android:id="@+id/acceptButton"
+            android:layout_weight=".5"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_alignParentTop="true"
             android:layout_toRightOf="@id/declineButton"
+            android:drawableRight="@drawable/ic_call_white_48dp"
             android:text="Accept"
-            android:onClick="acceptCall" />
+            android:onClick="acceptCall"
+            android:background="@drawable/button_green"
+            android:textColor="#ffffff"
+            android:textSize="24dp"/>
     </LinearLayout>
 </RelativeLayout>
