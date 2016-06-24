@@ -55,6 +55,7 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
 
         otherParty = getIntent().getStringExtra("com.laserscorpion.rttapp.contact_uri");
         setTitle("Call with " + otherParty);
+        addControlText("Status:");
 
         if (savedInstanceState != null) {
             CharSequence oldText = savedInstanceState.getCharSequence(STATE_1);
@@ -103,12 +104,22 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
         } else
            existing = textWithNoFEFF;
 
-        runOnUiThread(new Runnable() {
+        UiRunner lambda = (v, t, e) -> {
+            v.setText(e);
+            v.append(t);
+        };
+        runOnUiThread(view, lambda, toAdd.str, existing.toString());
+    }
+
+    interface UiRunner {
+        void runonuithread(TextView view, String text1, String text2);
+    }
+    void runOnUiThread(final TextView view, final UiRunner lambda, final String text1, final String text2) {
+        runOnUiThread(new Runnable() { // super
             @Override
             public void run() {
                 synchronized (view) {
-                    view.setText(existing);
-                    view.append(toAdd.str);
+                    lambda.runonuithread(view, text1, text2);
                     view.notify();
                 }
             }
@@ -118,7 +129,9 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
                 view.wait(1000);
             } catch (InterruptedException e) {}
         }
+
     }
+
 
     /**
      * Android framework programmers think that \uFEFF is an acceptable thing to leave in a string,
@@ -200,38 +213,14 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
 
     private void addControlText(final String text) {
         final TextView view = (TextView)findViewById(R.id.control_messages);
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                synchronized (view) {
-                    view.append("\n" + text);
-                    view.notify();
-                }
-            }
-        });
-        synchronized (view) {
-            try {
-                view.wait(1000);
-            } catch (InterruptedException e) {}
-        }
+        UiRunner lambda = (v, t, e) -> v.append(t);
+        runOnUiThread(view, lambda, '\n' + text, null);
     }
 
     private void setCallerText(final String text) {
         final TextView view = (TextView)findViewById(R.id.other_party_label);
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                synchronized (view) {
-                    view.append(text);
-                    view.notify();
-                }
-            }
-        });
-        synchronized (view) {
-            try {
-                view.wait(1000);
-            } catch (InterruptedException e) {}
-        }
+        UiRunner lambda = (v, t, e) -> v.setText(t);
+        runOnUiThread(view, lambda, text, null);
     }
 
 
@@ -240,8 +229,6 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
         texter.hangUp();
         finish();
     }
-
-    // TODO maybe unify all these runonuithread() calls by passing in a smaller bit of code somehow?
 
     @Override
     public void SessionClosed() {
