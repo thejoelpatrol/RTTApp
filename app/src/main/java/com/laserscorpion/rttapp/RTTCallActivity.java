@@ -29,6 +29,8 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
     public static final String TAG = "RTTCallActivity";
     private static final String STATE_1 = "currentText";
     private static final String STATE_2 = "receivedText";
+    private static final String STATE_3 = "controlText";
+    private static final String STATE_4 = "controlText";
     private SipClient texter;
     private CharSequence currentText;
     private Edit previousEdit;
@@ -45,6 +47,7 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
         setSupportActionBar(toolbar);
         getSupportActionBar().setHomeButtonEnabled(false);
         TextView view = (TextView)findViewById(R.id.textview);
+        TextView control = (TextView)findViewById(R.id.control_messages);
         EditText edit = (EditText)findViewById(R.id.compose_message);
         edit.addTextChangedListener(this);
         view.setMovementMethod(new ScrollingMovementMethod());
@@ -63,6 +66,9 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
             CharSequence receivedText = savedInstanceState.getCharSequence(STATE_2);
             screenRotated = true;
             view.setText(receivedText);
+            CharSequence controlText = savedInstanceState.getCharSequence(STATE_3);
+            control.setText(controlText);
+            setCallerText(otherParty + " says:");
         }
     }
 
@@ -87,8 +93,10 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
     protected void onSaveInstanceState(Bundle outState) {
         TextView view = (TextView)findViewById(R.id.textview);
         EditText edit = (EditText)findViewById(R.id.compose_message);
+        TextView control = (TextView)findViewById(R.id.control_messages);
         outState.putCharSequence(STATE_1, edit.getText());
         outState.putCharSequence(STATE_2, view.getText());
+        outState.putCharSequence(STATE_3, control.getText());
         super.onSaveInstanceState(outState);
     }
 
@@ -208,7 +216,7 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
     @Override
     public void SessionEstablished(String userName) {
         addControlText("Connected!");
-        setCallerText(userName + " says:\n");
+        setCallerText(userName + " says:");
     }
 
     private void addControlText(final String text) {

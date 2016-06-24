@@ -19,14 +19,14 @@ bugs
 -handle in-dialog INVITEs
 
 UI deficiencies
--so ugly
 -report errors via dialogs
 -log in RegistrationActivity is probably not useful
 -entire RegistrationActivity should be replaced with phone book or recent calls or something
 -make sure app continues running in bg - consider adding a service?
 -should vibrate on incoming call
--separate control message view from conversation
 -use display name, not just sip uri
+-should wake screen when call comes in
+-landscape mode in call doesn't look good
 
 Other limitations
 -NAT
