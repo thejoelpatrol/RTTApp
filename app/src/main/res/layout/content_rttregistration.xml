@@ -19,17 +19,21 @@
         android:layout_height="wrap_content">
         <EditText
             android:id="@+id/contact_name"
-            android:layout_alignParentTop="true"
+            android:layout_alignParentBottom="true"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
             android:layout_weight="1"
             android:hint="Contact Address"/>
         <Button
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_alignParentTop="true"
+            android:layout_alignParentBottom="true"
             android:layout_toRightOf="@id/contact_name"
-            android:text="Call"
+            android:text="Call "
+            android:drawableRight="@drawable/ic_call_white_24dp"
+            android:background="@drawable/button_blue"
+            android:layout_margin="10dp"
+            android:textColor="#ffffff"
             android:onClick="call" />
     </LinearLayout>
         <TextView

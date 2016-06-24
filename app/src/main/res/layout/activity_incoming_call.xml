@@ -15,7 +15,7 @@
         android:layout_height="wrap_content">
         <Button
             android:id="@+id/declineButton"
-            android:layout_weight=".5"
+            android:layout_weight=".48"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_alignParentTop="true"
@@ -24,10 +24,11 @@
             android:onClick="declineCall"
             android:background="@drawable/button_red"
             android:textColor="#ffffff"
-            android:textSize="24dp"/>
+            android:textSize="24dp"
+            android:layout_margin="10dp"/>
         <Button
             android:id="@+id/acceptButton"
-            android:layout_weight=".5"
+            android:layout_weight=".48"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_alignParentTop="true"
@@ -37,6 +38,7 @@
             android:onClick="acceptCall"
             android:background="@drawable/button_green"
             android:textColor="#ffffff"
-            android:textSize="24dp"/>
+            android:textSize="24dp"
+            android:layout_margin="10dp"/>
     </LinearLayout>
 </RelativeLayout>

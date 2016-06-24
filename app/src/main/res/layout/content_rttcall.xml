@@ -22,14 +22,21 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_alignParentTop="true"
-            android:text="Hang up"
-            android:onClick="hangUp" />
+            android:drawableRight="@drawable/ic_call_end_white_24dp"
+            android:background="@drawable/button_red"
+            android:textColor="#ffffff"
+            android:layout_margin="10dp"
+            android:text="Hang up "
+            android:onClick="hangUp"/>
         <Button
             android:id="@+id/saveButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_alignParentTop="true"
             android:layout_toRightOf="@id/declineButton"
+            android:background="@drawable/button_blue"
+            android:textColor="#ffffff"
+            android:layout_margin="10dp"
             android:text="Save Text"
             android:onClick="saveText" />
     </LinearLayout>
