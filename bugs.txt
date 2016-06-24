@@ -4,7 +4,6 @@ bugs
 	- but who really cares?
 -excess BYEs seem to be sent by the server, but they don’t seem to cause any problems
 -messed up lock handling for setting up new calls
--need to re-register after expiration (set alarm)
 -probably don't need to wait on get() any more
 	-actually, this caught a bug, sort of. if we are going to wait on get(), we should just make sending SIP messages synchronous and get rid of AsyncTask. otherwise, don't wait at all
 -non-printing characters are not always received correctly (cf some weird bad chars sent as newlines from SipCon1)

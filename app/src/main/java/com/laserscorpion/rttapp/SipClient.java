@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.gov.nist.javax.sdp.fields.AttributeField;
+import android.gov.nist.javax.sip.ResponseEventExt;
 import android.gov.nist.javax.sip.SipStackImpl;
 import android.gov.nist.javax.sip.address.AddressImpl;
 import android.gov.nist.javax.sip.clientauthutils.AuthenticationHelper;
@@ -44,6 +45,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Properties;
+import java.util.Timer;
 import java.util.TooManyListenersException;
 import java.util.Vector;
 import java.util.concurrent.ExecutionException;
@@ -93,6 +95,7 @@ public class SipClient implements SipListener, IPChangeListener {
     private SecureRandom randomGen;
     private ConnectivityReceiver connectivityReceiver;
     private boolean registrationPending = false;
+    private Timer registrationTimer;
 
     /*  callLock has a fairly normal purpose: it must be held whenever making a change
         to currentCall. However, it is sometimes held by an earlier action, a precondition
@@ -138,10 +141,9 @@ public class SipClient implements SipListener, IPChangeListener {
         randomGen = new SecureRandom();
         callLock = new Semaphore(1);
         connectivityReceiver = new ConnectivityReceiver(this);
+        registrationTimer = new Timer();
 
         parent.registerReceiver(connectivityReceiver, new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION));
-        //callDestructionLock = new Semaphore(1);
-        //allowed_methods = TextUtils.join(", ", ALLOWED_METHODS);
         finishInit();
     }
 
@@ -985,8 +987,21 @@ public class SipClient implements SipListener, IPChangeListener {
         else if (isRegisterResponse(responseEvent)) {
             sendControlMessage("Registered");
             registrationPending = false;
+            setRegistrationTimer(response);
         } else
             Log.d(TAG, "need to implement handling other successes");
+    }
+
+    /**
+     *
+     * @param response the 200 response to the REGISTER
+     */
+    private void setRegistrationTimer(Response response) {
+        registrationTimer.cancel();
+        registrationTimer = new Timer();
+        ExpiresHeader expires = response.getExpires();
+        int registrationLen = expires.getExpires() * 1000;
+        registrationTimer.schedule(new RegistrationTimerTask(this), registrationLen);
     }
 
     /*
@@ -1082,6 +1097,15 @@ public class SipClient implements SipListener, IPChangeListener {
             e.printStackTrace();
         }
 
+    }
+
+    public void registrationExpired() {
+        try {
+            register();
+        } catch (SipException e) {
+            // TODO handle this
+            e.printStackTrace();
+        }
     }
 
     @Override
