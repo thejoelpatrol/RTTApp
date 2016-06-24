@@ -25,6 +25,8 @@
             android:id="@+id/sip_username"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:textSize="16dp"
+            android:textColor="#000"
             android:text="username@"/>
         <EditText
             android:id="@+id/server_addr"
@@ -36,6 +38,8 @@
         <Button
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:background="@drawable/button_blue"
+            android:textColor="#fff"
             android:text="Register"
             android:onClick="register" />
     </LinearLayout>
