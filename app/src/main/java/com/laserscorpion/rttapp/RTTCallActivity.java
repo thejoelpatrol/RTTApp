@@ -184,7 +184,7 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
 
     @Override
     public void ControlMessageReceived(String message) {
-        addText(message + '\n');
+        addControlText(message);
     }
 
     @Override
@@ -194,18 +194,58 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
 
     @Override
     public void SessionEstablished(String userName) {
-        addText("Connected!\n\n");
-        addText(userName + " says:\n");
+        addControlText("Connected!");
+        setCallerText(userName + " says:\n");
     }
+
+    private void addControlText(final String text) {
+        final TextView view = (TextView)findViewById(R.id.control_messages);
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                synchronized (view) {
+                    view.append("\n" + text);
+                    view.notify();
+                }
+            }
+        });
+        synchronized (view) {
+            try {
+                view.wait(1000);
+            } catch (InterruptedException e) {}
+        }
+    }
+
+    private void setCallerText(final String text) {
+        final TextView view = (TextView)findViewById(R.id.other_party_label);
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                synchronized (view) {
+                    view.append(text);
+                    view.notify();
+                }
+            }
+        });
+        synchronized (view) {
+            try {
+                view.wait(1000);
+            } catch (InterruptedException e) {}
+        }
+    }
+
+
 
     public void hangUp(View view) {
         texter.hangUp();
         finish();
     }
 
+    // TODO maybe unify all these runonuithread() calls by passing in a smaller bit of code somehow?
+
     @Override
     public void SessionClosed() {
-        addText("\n\n***" + otherParty + " hung up.\n");
+        addControlText("***" + otherParty + " hung up.");
         // TODO replace with dialog, ask to save text
         try {
             Thread.sleep(2000,0);
@@ -215,11 +255,10 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
 
     @Override
     public void SessionFailed(String reason) {
-        addText("Failed to establish call: " + reason); // TODO replace with dialog
+        addControlText("Failed to establish call: " + reason); // TODO replace with dialog
         try {
             Thread.sleep(1000,0);
-        } catch (InterruptedException e) {
-        }
+        } catch (InterruptedException e) {}
         finish();
     }
 

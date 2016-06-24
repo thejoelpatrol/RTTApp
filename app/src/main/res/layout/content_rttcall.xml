@@ -40,20 +40,39 @@
             android:text="Save Text"
             android:onClick="saveText" />
     </LinearLayout>
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/top_row"
+        android:orientation="vertical">
+        <TextView
+            android:id="@+id/control_messages"
+            android:layout_width="match_parent"
+            android:layout_height="100dip"
+            android:gravity="top"
+            android:background="@drawable/back"
+            android:text="" />
+        <TextView
+            android:id="@+id/other_party_label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/control_messages"
+            android:text="" />
         <TextView
             android:id="@+id/textview"
             android:background="@drawable/back"
-            android:paddingBottom="4dip"
-            android:paddingLeft="4dip"
-            android:paddingRight="4dip"
-            android:paddingTop="4dip"
+            android:paddingBottom="8dip"
+            android:paddingLeft="8dip"
+            android:paddingRight="8dip"
+            android:paddingTop="8dip"
             android:layout_width="match_parent"
-            android:layout_height="200dip"
-            android:layout_below="@id/top_row"
+            android:layout_height="150dip"
+            android:layout_below="@id/other_party_label"
             android:layout_weight="1"
+            android:textSize="16sp"
             android:maxLines="10"
             android:scrollbars="vertical"
-            android:gravity="bottom" />
+            android:gravity="top" />
         <!-- EditText
             android:id="@+id/compose_message"
             android:background="@drawable/back"
@@ -75,5 +94,8 @@
             android:layout_below="@id/textview"
             android:layout_weight="1"
             android:hint="Your text"/>
+
+    </RelativeLayout>
+
 
 </RelativeLayout>
