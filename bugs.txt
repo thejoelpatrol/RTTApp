@@ -2,7 +2,6 @@ bugs
 
 -sometimes that JAIN SIP asynctask race condition is triggered in responding to OPTIONS 
 	- but who really cares?
--excess BYEs seem to be sent by the server, but they don’t seem to cause any problems
 -messed up lock handling for setting up new calls
 -probably don't need to wait on get() any more
 	-actually, this caught a bug, sort of. if we are going to wait on get(), we should just make sending SIP messages synchronous and get rid of AsyncTask. otherwise, don't wait at all
@@ -14,7 +13,6 @@ bugs
 -observed a crash declining a call after receiving a DialogTerminated message, or maybe it was in responding to a second incoming call when one was already incoming?
 	-then after this crash, java.lang.IllegalStateException: Singleton SipClient has not been initialized yet - init() before getInstance()
 -occasional text deletion problem that leaves too many chars intact? very hard to trigger, POSSIBLY fixed by removing \uFEFF from text upon every addition
--trying to send a payload more than 512 chars crashes RtpTextTransmitter (this includes redundant packets with multiple messages)
 -handle in-dialog INVITEs
 
 UI deficiencies

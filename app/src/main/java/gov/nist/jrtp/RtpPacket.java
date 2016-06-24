@@ -69,7 +69,7 @@ public class RtpPacket implements Serializable {
 	public final static int FIXED_HEADER_LENGTH = 12; // V..SSRC only
 
 	/** The maximum buffer (byte array) size for payload data. */
-	public static final int MAX_PAYLOAD_BUFFER_SIZE = 512;
+	public static final int MAX_PAYLOAD_BUFFER_SIZE = 65536 - 40;
 
 	/***************************************************************************
 	 * Variables
