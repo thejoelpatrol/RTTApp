@@ -23,6 +23,7 @@ UI deficiencies
 -use display name, not just sip uri
 -should wake screen when call comes in
 -landscape mode in call doesn't look good
+-word vs. character sending option
 
 
 Other limitations

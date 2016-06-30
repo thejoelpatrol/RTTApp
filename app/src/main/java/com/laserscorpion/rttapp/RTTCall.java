@@ -38,13 +38,11 @@ import se.omnitor.protocol.rtp.packets.RTPPacket;
 import se.omnitor.protocol.rtp.text.SyncBuffer;
 import se.omnitor.util.*;
 
-
-/**
- * Created by joel on 2/12/16.
- */
 public class RTTCall {
     private static final String TAG = "RTTCall";
     private static final int RFC4103_BUFFER_TIME = 300;
+    //private static final int TEXT_BUFFER_DELAY_MS = RFC4103_BUFFER_TIME; // too slow, it's only RECOMMENDED anyway
+    private static final int TEXT_BUFFER_DELAY_MS = 50;
     private static final int REDUNDANT_TEXT_GENERATIONS = 3;
     private SipClient sipClient;
     private Dialog dialog;
@@ -236,7 +234,7 @@ public class RTTCall {
         recvThread.start();
         boolean useRed = (t140RedMapNum > 0);
         int redGenerations = useRed  ? REDUNDANT_TEXT_GENERATIONS : 0;
-        outgoingBuf = new SyncBuffer(redGenerations, RFC4103_BUFFER_TIME);
+        outgoingBuf = new SyncBuffer(redGenerations, TEXT_BUFFER_DELAY_MS);
         outgoingBuf.start();
         try {
             session = manager.createRtpSession(localRTPPort, remoteIP, remotePort);
