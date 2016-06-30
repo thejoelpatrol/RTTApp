@@ -51,6 +51,7 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
         EditText edit = (EditText)findViewById(R.id.compose_message);
         edit.addTextChangedListener(this);
         view.setMovementMethod(new ScrollingMovementMethod());
+        control.setMovementMethod(new ScrollingMovementMethod());
 
         texter = SipClient.getInstance();
         texter.addSessionListener(this);
