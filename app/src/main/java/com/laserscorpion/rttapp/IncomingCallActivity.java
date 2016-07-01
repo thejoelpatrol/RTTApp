@@ -1,6 +1,7 @@
 package com.laserscorpion.rttapp;
 
 import android.content.Intent;
+import android.os.Vibrator;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.View;
@@ -42,7 +43,27 @@ public class IncomingCallActivity extends AppCompatActivity implements SessionLi
 
     private void close() {
         sipClient.removeSessionListener(this);
+        stopVibrating();
         finish();
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        startVibrating();
+    }
+
+    private void startVibrating() {
+        long pattern[] = {1000L, 1000L};
+        Vibrator vibrator = (Vibrator)getSystemService(VIBRATOR_SERVICE);
+        if (vibrator.hasVibrator())
+            vibrator.vibrate(pattern, 0);
+    }
+
+    private void stopVibrating() {
+        Vibrator vibrator = (Vibrator)getSystemService(VIBRATOR_SERVICE);
+        if (vibrator.hasVibrator())
+            vibrator.cancel();
     }
 
     @Override
