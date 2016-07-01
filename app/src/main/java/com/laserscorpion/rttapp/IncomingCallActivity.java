@@ -1,14 +1,22 @@
 package com.laserscorpion.rttapp;
 
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Vibrator;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.RelativeLayout;
+
+import java.util.Timer;
+import java.util.TimerTask;
 
 public class IncomingCallActivity extends AppCompatActivity implements SessionListener {
-    SipClient sipClient;
-    String from;
+    private static final long FLASH_TIME = 1000;
+    private SipClient sipClient;
+    private String from;
+    private Timer flashTimer;
+    private boolean white;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,6 +59,7 @@ public class IncomingCallActivity extends AppCompatActivity implements SessionLi
     public void onStart() {
         super.onStart();
         startVibrating();
+        setFlashTimer();
     }
 
     private void startVibrating() {
@@ -58,6 +67,11 @@ public class IncomingCallActivity extends AppCompatActivity implements SessionLi
         Vibrator vibrator = (Vibrator)getSystemService(VIBRATOR_SERVICE);
         if (vibrator.hasVibrator())
             vibrator.vibrate(pattern, 0);
+    }
+
+    private void setFlashTimer() {
+        flashTimer = new Timer();
+        flashTimer.schedule(new ScreenFlashTimer(), FLASH_TIME);
     }
 
     private void stopVibrating() {
@@ -81,5 +95,23 @@ public class IncomingCallActivity extends AppCompatActivity implements SessionLi
     public void SessionFailed(String reason) {
         // TODO throw up dialog: reason
         close();
+    }
+
+    private class ScreenFlashTimer extends TimerTask {
+        @Override
+        public void run() {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    View window = findViewById(R.id.incoming_call_window);
+                    if (white)
+                        window.setBackgroundColor(Color.CYAN);
+                    else
+                        window.setBackgroundColor(Color.WHITE);
+                }
+            });
+            white = !white;
+            setFlashTimer();
+        }
     }
 }
