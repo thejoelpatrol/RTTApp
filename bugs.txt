@@ -20,7 +20,6 @@ UI deficiencies
 -entire RegistrationActivity should be replaced with phone book or recent calls or something
 -make sure app continues running in bg - consider adding a service?
 -use display name, not just sip uri
--should wake screen when call comes in
 -landscape mode in call doesn't look good
 -word vs. character sending option
 

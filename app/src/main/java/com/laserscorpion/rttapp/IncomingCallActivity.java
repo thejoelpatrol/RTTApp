@@ -6,6 +6,8 @@ import android.os.Vibrator;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.View;
+import android.view.Window;
+import android.view.WindowManager;
 import android.widget.RelativeLayout;
 
 import java.util.Timer;
@@ -28,6 +30,13 @@ public class IncomingCallActivity extends AppCompatActivity implements SessionLi
         if (from.substring(0,4).equals("sip:"))
             from = from.substring(4);
         setTitle("Call from " + from);
+
+        // https://stackoverflow.com/questions/22452326/wake-phone-on-incoming-call-in-android
+        Window window = getWindow();
+        window.addFlags(WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD);
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        window.addFlags(WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
+        window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED);
     }
 
     public void acceptCall(View view) {

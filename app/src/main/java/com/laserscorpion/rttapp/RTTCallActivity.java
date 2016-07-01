@@ -8,6 +8,8 @@ import android.text.TextWatcher;
 import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.view.View;
+import android.view.Window;
+import android.view.WindowManager;
 import android.widget.EditText;
 import android.widget.TextView;
 
@@ -71,6 +73,12 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
             control.setText(controlText);
             setCallerText(otherParty + " says:");
         }
+
+        Window window = getWindow();
+        window.addFlags(WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD);
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        window.addFlags(WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
+        window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED);
     }
 
     @Override
