@@ -17,5 +17,6 @@
     <string name="title_activity_rttcall">RTTCallActivity</string>
     <string name="title_activity_rttregistration">RTTRegistrationActivity</string>
     <string name="title_activity_scrolling">ScrollingActivity</string>
+    <string name="error_dialog_arg">Message</string>
 
 </resources>
