@@ -7,7 +7,7 @@ import java.util.EventListener;
  */
 public interface TextListener extends EventListener {
 
-    void ControlMessageReceived(String message);
+    void controlMessageReceived(String message);
     void RTTextReceived(String text);
 
 }

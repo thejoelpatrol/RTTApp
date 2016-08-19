@@ -213,7 +213,7 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
     }
 
     @Override
-    public void ControlMessageReceived(String message) {
+    public void controlMessageReceived(String message) {
         addControlText(message);
     }
 

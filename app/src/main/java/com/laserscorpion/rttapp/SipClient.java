@@ -1,24 +1,9 @@
 package com.laserscorpion.rttapp;
 
-import android.content.BroadcastReceiver;
 import android.content.Context;
-import android.content.Intent;
 import android.content.IntentFilter;
-import android.gov.nist.javax.sdp.fields.AttributeField;
-import android.gov.nist.javax.sip.ResponseEventExt;
-import android.gov.nist.javax.sip.SipStackImpl;
 import android.gov.nist.javax.sip.address.AddressImpl;
 import android.gov.nist.javax.sip.clientauthutils.AuthenticationHelper;
-import android.gov.nist.javax.sip.header.ContentEncoding;
-import android.javax.sdp.Attribute;
-import android.javax.sdp.Connection;
-import android.javax.sdp.Media;
-import android.javax.sdp.MediaDescription;
-import android.javax.sdp.Origin;
-import android.javax.sdp.SdpException;
-import android.javax.sdp.SdpFactory;
-import android.javax.sdp.SdpParseException;
-import android.javax.sdp.SessionDescription;
 import android.javax.sip.SipException;
 import android.javax.sip.address.*;
 import android.javax.sip.header.*;
@@ -27,12 +12,10 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.AsyncTask;
 import android.os.StrictMode;
-import android.provider.MediaStore;
 import android.text.TextUtils;
 import android.util.Log;
 import android.javax.sip.*;
 
-import java.net.BindException;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
@@ -47,7 +30,6 @@ import java.util.ListIterator;
 import java.util.Properties;
 import java.util.Timer;
 import java.util.TooManyListenersException;
-import java.util.Vector;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Semaphore;
 
@@ -74,7 +56,6 @@ public class SipClient implements SipListener, IPChangeListener {
     private SipProvider sipProvider;
     private MessageFactory messageFactory;
     private HeaderFactory headerFactory;
-    //private SdpFactory SDPFactory;
     private AddressFactory addressFactory;
     private ListeningPoint listeningPoint;
     private Properties properties;
@@ -155,14 +136,11 @@ public class SipClient implements SipListener, IPChangeListener {
         properties.setProperty("android.javax.sip.STACK_NAME", "stack");
         properties.setProperty("android.javax.sip.IP_ADDRESS", localIP);
         properties.setProperty("android.javax.sip.TRACE_LEVEL", "32");
-        //properties.setProperty("android.javax.sip.REENTRANT_LISTENER", "true");
-        //properties.setProperty("android.gov.nist.javax.sip.REENTRANT_LISTENER", "true");
         try {
             sipStack = sipFactory.createSipStack(properties);
             messageFactory = sipFactory.createMessageFactory();
             headerFactory = sipFactory.createHeaderFactory();
             addressFactory = sipFactory.createAddressFactory();
-            //SDPFactory = SdpFactory.getInstance();
             openListeningPoint();
             sipProvider = sipStack.createSipProvider(listeningPoint);
             sipProvider.addSipListener(this);
@@ -172,6 +150,7 @@ public class SipClient implements SipListener, IPChangeListener {
             allowHeader = headerFactory.createAllowHeader(TextUtils.join(", ", ALLOWED_METHODS));
             maxForwardsHeader = headerFactory.createMaxForwardsHeader(MAX_FWDS);
         } catch (Exception e) {
+            parent.unregisterReceiver(connectivityReceiver);
             throw new SipException("Error: could not create SIP stack", e);
         }
     }
@@ -371,7 +350,7 @@ public class SipClient implements SipListener, IPChangeListener {
     private void sendControlMessage(String message) {
         synchronized (messageReceivers) {
             for (TextListener listener : messageReceivers) {
-                listener.ControlMessageReceived(message);
+                listener.controlMessageReceived(message);
             }
         }
     }
