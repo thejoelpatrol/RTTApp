@@ -1,4 +1,4 @@
-package com.laserscorpion.rttapp;
+package com.laserscorpion.rttapp.sip;
 
 import android.javax.sip.RequestEvent;
 import android.javax.sip.ServerTransaction;

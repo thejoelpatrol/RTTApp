@@ -1,4 +1,4 @@
-package com.laserscorpion.rttapp;
+package com.laserscorpion.rttapp.ui;
 
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -11,7 +11,7 @@ public class FailDialog extends AbstractDialog {
 
     public static FailDialog newInstance(String message) {
         FailDialog dialog = new FailDialog();
-        return (FailDialog) AbstractDialog.newInstance(message, dialog);
+        return (FailDialog) newInstance(message, dialog);
     }
 
     @Override

@@ -1,4 +1,4 @@
-package com.laserscorpion.rttapp;
+package com.laserscorpion.rttapp.sip;
 
 import android.gov.nist.core.Host;
 import android.gov.nist.javax.sdp.fields.AttributeField;

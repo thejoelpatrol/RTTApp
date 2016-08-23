@@ -8,7 +8,7 @@
     android:paddingRight="@dimen/activity_horizontal_margin"
     android:paddingTop="@dimen/activity_vertical_margin"
     android:id="@+id/incoming_call_window"
-    tools:context=".IncomingCallActivity">
+    tools:context=".ui.IncomingCallActivity">
 
     <LinearLayout
         android:id="@+id/buttons"

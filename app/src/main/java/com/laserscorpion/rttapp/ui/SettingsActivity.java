@@ -1,4 +1,4 @@
-package com.laserscorpion.rttapp;
+package com.laserscorpion.rttapp.ui;
 
 import android.os.Build;
 import android.os.Bundle;

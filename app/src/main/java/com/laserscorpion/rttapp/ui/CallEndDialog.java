@@ -1,4 +1,4 @@
-package com.laserscorpion.rttapp;
+package com.laserscorpion.rttapp.ui;
 
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -12,7 +12,7 @@ public class CallEndDialog extends AbstractDialog {
 
     public static CallEndDialog newInstance(String message) {
         CallEndDialog dialog = new CallEndDialog();
-        return (CallEndDialog) AbstractDialog.newInstance(message, dialog);
+        return (CallEndDialog) newInstance(message, dialog);
     }
 
     @Override

@@ -5,21 +5,18 @@ import android.javax.sip.Dialog;
 import android.javax.sip.RequestEvent;
 import android.javax.sip.ServerTransaction;
 import android.javax.sip.address.Address;
-import android.javax.sip.header.ContactHeader;
 import android.javax.sip.header.FromHeader;
 import android.javax.sip.header.ToHeader;
 import android.javax.sip.message.Request;
 import android.util.Log;
 
-import org.w3c.dom.Text;
+import com.laserscorpion.rttapp.sip.SipClient;
+import com.laserscorpion.rttapp.sip.TextListener;
 
 import java.io.IOException;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
-import java.util.LinkedList;
 import java.util.List;
-import java.util.Queue;
-import java.util.Set;
 import java.util.concurrent.Semaphore;
 
 import gov.nist.jrtp.RtpErrorEvent;
@@ -52,8 +49,6 @@ public class RTTCall {
     private RequestEvent incomingRequest;
     private ServerTransaction inviteTransaction;
 
-
-    private Semaphore creationLock;
     private Semaphore destructionLock;
     private boolean ringing = false;
     private boolean connected = false;
@@ -241,7 +236,6 @@ public class RTTCall {
             session.addRtpListener(recvThread);
             session.receiveRTPPackets();
             int payloadType = useRed ? t140RedMapNum : t140MapNum;
-            //sendThread = new SendThread(session, payloadType);
             transmitter = new RtpTextTransmitter(session, true, t140MapNum, useRed,
                                                     t140RedMapNum, redGenerations, outgoingBuf, false);
             transmitter.start();
@@ -382,13 +376,11 @@ public class RTTCall {
      * it to the UI class(es) that are waiting to display it.
      */
     private class TextPrintThread extends Thread {
-        //List<TextListener> messageReceivers;
         RTTCall parent;
         FifoBuffer buffer;
         boolean stop = false;
 
         public TextPrintThread(RTTCall parent, FifoBuffer buffer) {
-            //this.messageReceivers = messageReceivers;
             this.parent = parent;
             this.buffer = buffer;
         }

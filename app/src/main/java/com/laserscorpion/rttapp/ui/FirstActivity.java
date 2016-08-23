@@ -1,4 +1,4 @@
-package com.laserscorpion.rttapp;
+package com.laserscorpion.rttapp.ui;
 
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -11,6 +11,8 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.EditText;
 import android.widget.TextView;
+
+import com.laserscorpion.rttapp.R;
 
 public class FirstActivity extends AppCompatActivity {
     public static final String EXTRA_MESSAGE = "com.laserscorpion.rttapp.MESSAGE";

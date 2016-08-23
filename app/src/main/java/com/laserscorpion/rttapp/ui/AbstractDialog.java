@@ -1,4 +1,4 @@
-package com.laserscorpion.rttapp;
+package com.laserscorpion.rttapp.ui;
 
 import android.app.Activity;
 import android.app.DialogFragment;

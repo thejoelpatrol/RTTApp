@@ -1,4 +1,4 @@
-package com.laserscorpion.rttapp;
+package com.laserscorpion.rttapp.sip;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -6,6 +6,8 @@ import android.content.Intent;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.util.Log;
+
+import com.laserscorpion.rttapp.BuildConfig;
 
 
 public class ConnectivityReceiver extends BroadcastReceiver {
@@ -18,7 +20,6 @@ public class ConnectivityReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(final Context context, final Intent intent) {
-        //if (BuildConfig.DEBUG) Log.d(TAG, "Received some kind of broadcast");
         if (intent.getAction().equals(ConnectivityManager.CONNECTIVITY_ACTION)) {
             if (BuildConfig.DEBUG) Log.d(TAG, "Received connectivity action");
             ConnectivityManager connMgr = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);

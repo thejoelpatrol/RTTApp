@@ -1,4 +1,4 @@
-package com.laserscorpion.rttapp;
+package com.laserscorpion.rttapp.sip;
 
 import android.content.Context;
 import android.content.IntentFilter;
@@ -36,14 +36,15 @@ import java.util.concurrent.Semaphore;
 import android.gov.nist.javax.sip.SipStackExt;
 import android.gov.nist.javax.sip.clientauthutils.*;
 
-import com.laserscorpion.rttapp.ConnectivityReceiver.IPChangeListener;
+import com.laserscorpion.rttapp.BuildConfig;
+import com.laserscorpion.rttapp.RTTCall;
 
 import gov.nist.jrtp.RtpException;
 
 /**
  * Some of this class based on http://alex.bikfalvi.com/teaching/upf/2013/architecture_and_signaling/lab/sip/
  */
-public class SipClient implements SipListener, IPChangeListener {
+public class SipClient implements SipListener, ConnectivityReceiver.IPChangeListener {
     private static final String TAG = "SipClient";
     private static final int MAX_FWDS = 70;
     private static final int DEFAULT_REGISTRATION_LEN = 600;

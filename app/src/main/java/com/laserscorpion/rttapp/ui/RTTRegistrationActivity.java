@@ -1,4 +1,4 @@
-package com.laserscorpion.rttapp;
+package com.laserscorpion.rttapp.ui;
 
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -14,11 +14,16 @@ import android.view.View;
 import android.widget.EditText;
 import android.widget.TextView;
 
+import com.laserscorpion.rttapp.sip.CallReceiver;
+import com.laserscorpion.rttapp.R;
+import com.laserscorpion.rttapp.sip.SipClient;
+import com.laserscorpion.rttapp.sip.TextListener;
+
 import java.text.ParseException;
 
 
 public class RTTRegistrationActivity extends AppCompatActivity implements TextListener,
-                                                                            CallReceiver,
+        CallReceiver,
                                                                             AbstractDialog.DialogListener,
                                                                             FailDialog.QuitDialogListener {
     public static final String TAG = "RTTRegistrationActivity";

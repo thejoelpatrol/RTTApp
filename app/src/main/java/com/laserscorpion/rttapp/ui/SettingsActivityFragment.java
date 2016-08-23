@@ -1,4 +1,4 @@
-package com.laserscorpion.rttapp;
+package com.laserscorpion.rttapp.ui;
 
 import android.preference.PreferenceFragment;
 import android.support.v4.app.Fragment;

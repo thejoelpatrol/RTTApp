@@ -1,4 +1,4 @@
-package com.laserscorpion.rttapp;
+package com.laserscorpion.rttapp.ui;
 
 import android.content.Intent;
 import android.graphics.Color;
@@ -8,7 +8,10 @@ import android.os.Bundle;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
-import android.widget.RelativeLayout;
+
+import com.laserscorpion.rttapp.R;
+import com.laserscorpion.rttapp.sip.SessionListener;
+import com.laserscorpion.rttapp.sip.SipClient;
 
 import java.util.Timer;
 import java.util.TimerTask;

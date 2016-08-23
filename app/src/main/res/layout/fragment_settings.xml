@@ -6,7 +6,7 @@
     android:paddingLeft="@dimen/activity_horizontal_margin"
     android:paddingRight="@dimen/activity_horizontal_margin"
     android:paddingTop="48dp"
-    tools:context="com.laserscorpion.rttapp.SettingsActivityFragment"
+    tools:context=".ui.SettingsActivityFragment"
     tools:showIn="@layout/content_settings">
 
     <ListView

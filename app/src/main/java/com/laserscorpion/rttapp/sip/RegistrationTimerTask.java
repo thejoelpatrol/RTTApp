@@ -1,6 +1,4 @@
-package com.laserscorpion.rttapp;
-
-import android.util.Log;
+package com.laserscorpion.rttapp.sip;
 
 import java.util.TimerTask;
 

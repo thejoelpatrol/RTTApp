@@ -1,4 +1,4 @@
-package com.laserscorpion.rttapp;
+package com.laserscorpion.rttapp.ui;
 
 import android.app.AlertDialog;
 import android.app.Dialog;
@@ -9,7 +9,7 @@ public class DismissableDialog extends AbstractDialog {
 
     public static DismissableDialog newInstance(String message) {
         DismissableDialog dialog = new DismissableDialog();
-        return (DismissableDialog) AbstractDialog.newInstance(message, dialog);
+        return (DismissableDialog) newInstance(message, dialog);
     }
 
     @Override
