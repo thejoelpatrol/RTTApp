@@ -260,23 +260,12 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener,
 
     @Override
     public void SessionClosed() {
-        //addControlText("***" + otherParty + " hung up.");
         showEndCallDialog(otherParty + " hung up. Do you want to save the text of this call?");
-        // TODO replace with dialog, ask to save text
-        /*try {
-            Thread.sleep(2000, 0);
-        } catch (InterruptedException e) {
-        }*/
-        //finish();
     }
 
     @Override
     public void SessionFailed(String reason) {
         showFailDialog("Failed to establish call: " + reason);
-        //try {
-        //    Thread.sleep(1000,0);
-        //} catch (InterruptedException e) {}
-        //finish();
     }
 
     @Override
@@ -379,14 +368,8 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener,
      * Precondition: charsOnlyDeleted()
      */
     private void sendDeletionsFromEnd(CharSequence now, int start, int before, int count) {
-        Log.d(TAG, "chars deleted from end - " + start + " - " + before + " - " + count);
+        //Log.d(TAG, "chars deleted from end - " + start + " - " + before + " - " + count);
         sendBackspaces(before - count);
-        /*if (previousEdit != null && previousEdit.start == start && previousEdit.count == 0) {
-            // this is the case where the last word has been deleted in two steps by the keyboard, i.e. the cursor is in the middle of the word and it is replaced
-            sendBackspaces(previousEdit.before);
-
-            // this is no longer necessary - we now handle editing the last word all at once
-        }*/
     }
 
     /**
