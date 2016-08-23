@@ -13,7 +13,7 @@ import android.widget.RelativeLayout;
 import java.util.Timer;
 import java.util.TimerTask;
 
-public class IncomingCallActivity extends AppCompatActivity implements SessionListener {
+public class IncomingCallActivity extends AppCompatActivity implements SessionListener, AbstractDialog.DialogListener {
     private static final long FLASH_TIME = 1000;
     private SipClient sipClient;
     private String from;
@@ -96,15 +96,28 @@ public class IncomingCallActivity extends AppCompatActivity implements SessionLi
 
     @Override
     public void SessionClosed() {
-        // TODO throw up dialog: other party hung up
-        close();
+        stopVibrating();
+        showFailDialog(from + " hung up.");
+        // close() called from within dialog box handler
     }
 
     @Override
     public void SessionFailed(String reason) {
-        // TODO throw up dialog: reason
+        stopVibrating();
+        showFailDialog("Call failed: " + reason);
+        // close() called from within dialog box handler
+    }
+
+    private void showFailDialog(String message) {
+        DismissableDialog dialog = DismissableDialog.newInstance(message);
+        dialog.show(getFragmentManager(), "error");
+    }
+
+    @Override
+    public void dialogDismissed() {
         close();
     }
+
 
     private class ScreenFlashTimer extends TimerTask {
         @Override
