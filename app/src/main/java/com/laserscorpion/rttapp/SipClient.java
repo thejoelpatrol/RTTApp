@@ -591,10 +591,9 @@ public class SipClient implements SipListener, IPChangeListener {
                         currentCall.resetMessageReceivers(messageReceivers);
                         notifySessionEstablished();
                     } catch (RtpException e) {
-                        // TODO: throw up a dialog explaining call failure
                         Log.d(TAG, "call failed");
                         currentCall = null;
-                        notifySessionFailed("couldn't establish call");
+                        notifySessionFailed("couldn't establish RTP session");
                     }
                 }
                 else
@@ -692,8 +691,7 @@ public class SipClient implements SipListener, IPChangeListener {
             responder.execute(response);
         } catch (Exception e) {
             // again, this is a lot of exceptions to catch all at once. oh well...
-            // TODO handle this
-            e.printStackTrace();
+            if (BuildConfig.DEBUG) e.printStackTrace();
             currentCall.end();
             currentCall = null;
             notifySessionFailed("couldn't establish call");
@@ -789,7 +787,6 @@ public class SipClient implements SipListener, IPChangeListener {
                 return true;
         } catch (ParseException e) {
             if (BuildConfig.DEBUG) Log.d(TAG, "Unable to check address - assuming it is not for us");
-            //e.printStackTrace();
         }
         return false;
     }
@@ -799,7 +796,7 @@ public class SipClient implements SipListener, IPChangeListener {
         if (currentCall.isRinging() && cancelApplies(requestEvent, currentCall)) {
             RequestEvent initialINVITE = currentCall.getCreationEvent();
             respondGeneric(initialINVITE, initialINVITE.getServerTransaction(), Response.REQUEST_TERMINATED);
-            notifySessionFailed("Caller cancelled call");
+            notifySessionFailed("Caller hung up/cancelled call");
             callLock.release();
             if (BuildConfig.DEBUG) Log.d(TAG, "1111111111 should be 1:" + callLock.availablePermits());
             terminateCall();
@@ -907,8 +904,13 @@ public class SipClient implements SipListener, IPChangeListener {
                 case Response.NOT_ACCEPTABLE:
                     notifySessionFailed("callee doesn't support RTT");
                     break;
+                case Response.REQUEST_TIMEOUT:
+                    notifySessionFailed("callee didn't answer");
+                    break;
+                case Response.REQUEST_TERMINATED:
+                    break; // we probably initiated this on our end
                 default:
-                    notifySessionFailed("call failed");
+                    notifySessionFailed("INVITE failed");
                     break;
             }
             hangUp();
@@ -994,7 +996,7 @@ public class SipClient implements SipListener, IPChangeListener {
         try {
             ACKResponse(response, dialog);
         } catch (Exception e) {
-            Log.e(TAG, "call failed");
+            if (BuildConfig.DEBUG) Log.e(TAG, "call failed");
             e.printStackTrace();
             currentCall.end();
             currentCall = null;
@@ -1011,11 +1013,10 @@ public class SipClient implements SipListener, IPChangeListener {
                 currentCall.callAccepted(SDPBuilder.getRemoteIP(response), SDPBuilder.getT140PortNum(response), port + 1, agreedT140MapNum, agreedT140RedMapNum);
                 notifySessionEstablished();
             } catch (RtpException e) {
-                // TODO: throw up a dialog explaining call failure
-                Log.d(TAG, "call failed");
+                if (BuildConfig.DEBUG) Log.d(TAG, "call failed");
                 currentCall.end();
                 currentCall = null;
-                notifySessionFailed("couldn't establish call");
+                notifySessionFailed("couldn't establish RTP session");
             }
         } else {
             Log.d(TAG, "not acceptable");
