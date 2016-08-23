@@ -1,6 +1,5 @@
 package com.laserscorpion.rttapp;
 
-import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.javax.sip.SipException;
@@ -20,7 +19,7 @@ import java.text.ParseException;
 
 public class RTTRegistrationActivity extends AppCompatActivity implements TextListener,
                                                                             CallReceiver,
-                                                                            ErrorDialog.DialogListener,
+                                                                            AbstractDialog.DialogListener,
                                                                             FailDialog.QuitDialogListener {
     public static final String TAG = "RTTRegistrationActivity";
     private String REGISTRAR_PREF_NAME; // these are basically constants
