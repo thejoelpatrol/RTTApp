@@ -14,17 +14,19 @@ bugs
 -occasional text deletion problem that leaves too many chars intact? very hard to trigger, POSSIBLY fixed by removing \uFEFF from text upon every addition
 -handle in-dialog INVITEs
 
+
 UI deficiencies
--report errors via dialogs
 -log in RegistrationActivity is probably not useful
 -entire RegistrationActivity should be replaced with phone book or recent calls or something
 -make sure app continues running in bg - consider adding a service?
 -use display name, not just sip uri
 -landscape mode in call doesn't look good
 -word vs. character sending option
+-end call when IP address changes (detect dropped call)
 
 
 Other limitations
 -NAT
 -IPv6
+-no encryption
 -no tests
