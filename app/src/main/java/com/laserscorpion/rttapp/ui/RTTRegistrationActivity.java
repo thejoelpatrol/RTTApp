@@ -25,7 +25,7 @@ import java.text.ParseException;
 public class RTTRegistrationActivity extends AppCompatActivity implements TextListener,
         CallReceiver,
                                                                             AbstractDialog.DialogListener,
-                                                                            FailDialog.QuitDialogListener {
+        FailDialog.FailDialogListener {
     public static final String TAG = "RTTRegistrationActivity";
     private String REGISTRAR_PREF_NAME; // these are basically constants
     private String USERNAME_PREF_NAME; // but you can't access xml resources statically

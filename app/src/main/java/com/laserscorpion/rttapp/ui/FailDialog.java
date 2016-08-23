@@ -7,7 +7,7 @@ import android.content.DialogInterface;
 import android.os.Bundle;
 
 public class FailDialog extends AbstractDialog {
-    QuitDialogListener quitter;
+    FailDialogListener listener;
 
     public static FailDialog newInstance(String message) {
         FailDialog dialog = new FailDialog();
@@ -17,7 +17,7 @@ public class FailDialog extends AbstractDialog {
     @Override
     public void onAttach(Activity activity) {
         super.onAttach(activity);
-        quitter = (QuitDialogListener)activity;
+        listener = (FailDialogListener)activity;
     }
 
     @Override
@@ -27,13 +27,13 @@ public class FailDialog extends AbstractDialog {
         builder.setMessage(message);
         builder.setNegativeButton("Back", new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog, int id) {
-                quitter.dialogFail();
+                listener.dialogFail();
             }
         });
-        return builder.create();
+        return createDialog(builder);
     }
 
-    public interface QuitDialogListener {
+    public interface FailDialogListener {
         void dialogFail();
     }
 

@@ -22,7 +22,7 @@ public class DismissableDialog extends AbstractDialog {
                 listener.dialogDismissed();
             }
         });
-        return builder.create();
+        return createDialog(builder);
     }
 
 }

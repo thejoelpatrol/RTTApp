@@ -1,6 +1,8 @@
 package com.laserscorpion.rttapp.ui;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.app.Dialog;
 import android.app.DialogFragment;
 import android.os.Bundle;
 
@@ -27,6 +29,13 @@ public abstract class AbstractDialog extends DialogFragment {
         super.onCreate(savedInstanceState);
         Bundle args = getArguments();
         message = args.getString(KEY);
+    }
+
+    protected Dialog createDialog(AlertDialog.Builder builder) {
+        Dialog dialog = builder.create();
+        dialog.setCanceledOnTouchOutside(false);
+        dialog.setCancelable(false);
+        return dialog;
     }
 
     public interface DialogListener {

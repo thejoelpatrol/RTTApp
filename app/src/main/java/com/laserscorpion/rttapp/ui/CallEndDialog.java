@@ -36,7 +36,7 @@ public class CallEndDialog extends AbstractDialog {
                 saver.dialogSaveText();
             }
         });
-        return builder.create();
+        return createDialog(builder);
     }
 
     public interface SaveDialogListener extends DialogListener {

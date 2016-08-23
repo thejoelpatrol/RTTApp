@@ -3,8 +3,6 @@ package com.laserscorpion.rttapp.ui;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
-import android.text.Editable;
-import android.text.TextWatcher;
 import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.view.View;
@@ -19,13 +17,10 @@ import com.laserscorpion.rttapp.sip.SessionListener;
 import com.laserscorpion.rttapp.sip.SipClient;
 import com.laserscorpion.rttapp.sip.TextListener;
 
-import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-
 
 public class RTTCallActivity extends AppCompatActivity implements TextListener,
                                                                     SessionListener,
-                                                                    FailDialog.QuitDialogListener,
+        FailDialog.FailDialogListener,
                                                                     AbstractDialog.DialogListener,
                                                                     CallEndDialog.SaveDialogListener {
 
