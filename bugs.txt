@@ -23,6 +23,7 @@ UI deficiencies
 -landscape mode in call doesn't look good
 -word vs. character sending option
 -end call when IP address changes (detect dropped call)
+-text saving doesn't do anything
 
 
 Other limitations
