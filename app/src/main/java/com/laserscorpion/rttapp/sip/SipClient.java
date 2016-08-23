@@ -908,6 +908,9 @@ public class SipClient implements SipListener, ConnectivityReceiver.IPChangeList
                 case Response.REQUEST_TIMEOUT:
                     notifySessionFailed("callee didn't answer");
                     break;
+                case Response.TEMPORARILY_UNAVAILABLE:
+                    notifySessionFailed("callee not reachable");
+                    break;
                 case Response.REQUEST_TERMINATED:
                     break; // we probably initiated this on our end
                 default:
