@@ -24,8 +24,7 @@ import java.util.Arrays;
 
 
 public class RTTCallActivity extends AppCompatActivity implements TextListener,
-        SessionListener,
-                                                                    TextWatcher,
+                                                                    SessionListener,
                                                                     FailDialog.QuitDialogListener,
                                                                     AbstractDialog.DialogListener,
                                                                     CallEndDialog.SaveDialogListener {
@@ -47,12 +46,9 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener,
     private static final String STATE_3 = "controlText";
     private static final String STATE_4 = "controlText";
     private SipClient texter;
-    private CharSequence currentText;
     private Edit previousEdit;
-    private boolean makingManualEdit = false;
-    private boolean needManualEdit = false; // flag that indicates that we need to undo the text change the user made - not allowed to edit earlier text
-    private boolean screenRotated = false;
     private String otherParty;
+    TextEntryMonitor textHandler; // this watches text input and sends the RTT chars
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -64,7 +60,6 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener,
         TextView view = (TextView) findViewById(R.id.textview);
         TextView control = (TextView) findViewById(R.id.control_messages);
         EditText edit = (EditText) findViewById(R.id.compose_message);
-        edit.addTextChangedListener(this);
         view.setMovementMethod(new ScrollingMovementMethod());
         control.setMovementMethod(new ScrollingMovementMethod());
 
@@ -77,14 +72,15 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener,
         addControlText("Status:");
 
         if (savedInstanceState != null) {
-            CharSequence oldText = savedInstanceState.getCharSequence(STATE_1);
-            currentText = oldText;
+            CharSequence currentText = savedInstanceState.getCharSequence(STATE_1);
             CharSequence receivedText = savedInstanceState.getCharSequence(STATE_2);
-            screenRotated = true;
             view.setText(receivedText);
             CharSequence controlText = savedInstanceState.getCharSequence(STATE_3);
             control.setText(controlText);
             setCallerText(otherParty + " says:");
+            textHandler = new TextEntryMonitor(this, edit, texter, currentText, true);
+        } else {
+            textHandler = new TextEntryMonitor(this, edit, texter, null, false);
         }
 
         Window window = getWindow();
@@ -274,194 +270,9 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener,
         showFailDialog("Failed to establish call: " + reason);
     }
 
-    @Override
-    public synchronized void beforeTextChanged(CharSequence s, int start, int count, int after) {
-        if (makingManualEdit)
-            return;
-        currentText = s.subSequence(0, s.length()); // deep copy the text before it is changed so we can compare before and after the edit
-    }
 
-    /**
-     * This is the bulk of the logic to determine which characters to send to the other party when the user enters text
-     */
-    @Override
-    public synchronized void onTextChanged(CharSequence s, int start, int before, int count) {
-        if (makingManualEdit) {
-            if (BuildConfig.DEBUG) Log.d(TAG, "ignoring manual edit");
-            return;
-        }
-        if (screenRotated) {
-            screenRotated = false;
-            return; // ignore text addition due to destruction and recreation of activity
-        }
-        if (BuildConfig.DEBUG)
-            Log.d(TAG, "text changed! start: " + start + " | before: " + before + " | count: " + count);
-
-        if (editOverlappedEnd(start, before, count)) {
-            if (charsOnlyAppended(s, start, before, count)) {
-                sendAppendedChars(s, start, before, count);
-            } else if (charsOnlyDeleted(s, start, before, count)) {
-                sendDeletionsFromEnd(s, start, before, count);
-            } else if (count == before) {
-                if (textActuallyChanged(s, start, before, count)) {
-                    // when entering a space, the previous word is reported as changing for some reason, but it hasn't actually changed, so we must check
-                    sendCompoundReplacementText(s, start, before, count);
-                }
-            } else {
-                if (BuildConfig.DEBUG) Log.d(TAG, "Some kind of complex edit occurred 1");
-                sendCompoundReplacementText(s, start, before, count);
-            }
-        } else {
-            if (editInLastWord(start, before, count)) {
-                if (BuildConfig.DEBUG) Log.d(TAG, "edit in last word");
-                sendLastWord(s, start, before, count);
-            } else {
-                if (BuildConfig.DEBUG) Log.d(TAG, "Some kind of complex edit occurred 2");
-                needManualEdit = true;
-                // we can't allow edits that occur earlier in the text, you can only edit the end
-            }
-        }
-    }
-
-    private void sendLastWord(CharSequence now, int start, int before, int count) {
-        int len = currentText.length() - lastWordStart(currentText);
-        sendBackspaces(len);
-        int newLen = now.length() - lastWordStart(currentText);
-
-        CharSequence add = now.subSequence(now.length() - newLen, now.length());
-        texter.sendRTTChars(add.toString());
-    }
-
-    private boolean editInLastWord(int start, int before, int count) {
-        if (start >= lastWordStart(currentText))
-            return true;
-        return false;
-    }
-
-    private int lastWordStart(CharSequence text) {
-        int i = text.length() - 1;
-        for (; i >= 0; i--) {
-            char c = text.charAt(i);
-            if (Character.isWhitespace(c))
-                break;
-        }
-        return i + 1;
-    }
-
-    private void sendBackspaces(int howMany) {
-        byte[] del = new byte[howMany];
-        Arrays.fill(del, (byte) 0x08);
-        texter.sendRTTChars(new String(del, StandardCharsets.UTF_8));
-    }
-
-    /**
-     * Precondition: charsOnlyAppended()
-     */
-    private void sendAppendedChars(CharSequence now, int start, int before, int count) {
-        if (BuildConfig.DEBUG) Log.d(TAG, "chars appended");
-        CharSequence added = now.subSequence(start + before, now.length());
-        try {
-            texter.sendRTTChars(added.toString());
-        } catch (IllegalStateException e) {
-            addText("Can't send text yet - call not connected\n");
-            makingManualEdit = true;
-            EditText edit = (EditText) findViewById(R.id.compose_message);
-            edit.setText(null);
-        }
-    }
-
-    /**
-     * Precondition: charsOnlyDeleted()
-     */
-    private void sendDeletionsFromEnd(CharSequence now, int start, int before, int count) {
-        //Log.d(TAG, "chars deleted from end - " + start + " - " + before + " - " + count);
-        sendBackspaces(before - count);
-    }
-
-    /**
-     *
-     */
-    private void sendCompoundReplacementText(CharSequence now, int start, int before, int count) {
-        sendBackspaces(before);
-        CharSequence seq = now.subSequence(start, start + count);
-        texter.sendRTTChars(seq.toString());
-    }
-
-    /**
-     * Check whether the text that changed included the end of the entire text.
-     * If not, we can't allow the edit. You must only add and delete chars
-     * at the end of the text.
-     */
-    private boolean editOverlappedEnd(int start, int before, int count) {
-        if (currentText == null)
-            return true;
-        return (start + before == currentText.length());
-    }
-
-    /**
-     * Precondition: editOverlappedEnd()
-     */
-    private boolean charsOnlyAppended(CharSequence now, int start, int before, int count) {
-        if (before == 0)
-            return true;
-        if (before >= count)
-            return false; // if before == count, the last word was changed, but no additional chars appended
-
-        CharSequence origSeq = currentText.subSequence(start, start + before);
-        CharSequence newSeq = now.subSequence(start, start + before);
-        String origString = origSeq.toString();
-        String newString = newSeq.toString();
-        if (origString.equals(newString))
-            return true;
-        return false;
-    }
-
-    /**
-     * Precondition: editOverlappedEnd()
-     */
-    private boolean charsOnlyDeleted(CharSequence s, int start, int before, int count) {
-        if (before <= count)
-            return false; // if before == count, the last word was changed, but no net chars deleted
-        if (count == 0)
-            return true;
-        String origString = currentText.subSequence(start, start + count).toString();
-        String newString = s.subSequence(start, start + count).toString();
-        if (origString.equals(newString))
-            return true;
-        return false;
-    }
-
-    /**
-     * Precondition: before == count
-     * <p>
-     * for some reason, when spaces are added, the previous word is reported as changing, but it doesn't really,
-     * so we are checking that here
-     */
-    private boolean textActuallyChanged(CharSequence now, int start, int before, int count) {
-        if (currentText == null)
-            return true;
-        String changed = now.subSequence(start, start + count).toString();
-        String origStr = currentText.toString();
-        if (origStr.regionMatches(start, changed, 0, before))
-            return false;
-        return true;
-    }
 
     public void saveText(View view) {
-
-    }
-
-    @Override
-    public synchronized void afterTextChanged(Editable s) {
-        if (needManualEdit) {
-            makingManualEdit = true;
-            needManualEdit = false;
-            s.replace(0, s.length(), currentText);
-            if (BuildConfig.DEBUG) Log.d(TAG, "initiating replacement to undo prohibited edit");
-        }
-        if (makingManualEdit) {
-            makingManualEdit = false;
-        }
 
     }
 
