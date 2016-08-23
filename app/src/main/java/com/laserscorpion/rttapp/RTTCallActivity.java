@@ -17,12 +17,19 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 
-public class RTTCallActivity extends AppCompatActivity implements TextListener, SessionListener, TextWatcher {
+public class RTTCallActivity extends AppCompatActivity implements TextListener,
+                                                                    SessionListener,
+                                                                    TextWatcher,
+                                                                    FailDialog.QuitDialogListener,
+                                                                    AbstractDialog.DialogListener,
+                                                                    CallEndDialog.SaveDialogListener {
+
     private class Edit {
         public int start;
         public int before;
         public int count;
     }
+
     private class CleanString {
         public int backspaces = 0;
         public String str = new String();
@@ -48,9 +55,9 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         getSupportActionBar().setHomeButtonEnabled(false);
-        TextView view = (TextView)findViewById(R.id.textview);
-        TextView control = (TextView)findViewById(R.id.control_messages);
-        EditText edit = (EditText)findViewById(R.id.compose_message);
+        TextView view = (TextView) findViewById(R.id.textview);
+        TextView control = (TextView) findViewById(R.id.control_messages);
+        EditText edit = (EditText) findViewById(R.id.compose_message);
         edit.addTextChangedListener(this);
         view.setMovementMethod(new ScrollingMovementMethod());
         control.setMovementMethod(new ScrollingMovementMethod());
@@ -100,9 +107,9 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
 
     @Override
     protected void onSaveInstanceState(Bundle outState) {
-        TextView view = (TextView)findViewById(R.id.textview);
-        EditText edit = (EditText)findViewById(R.id.compose_message);
-        TextView control = (TextView)findViewById(R.id.control_messages);
+        TextView view = (TextView) findViewById(R.id.textview);
+        EditText edit = (EditText) findViewById(R.id.compose_message);
+        TextView control = (TextView) findViewById(R.id.control_messages);
         outState.putCharSequence(STATE_1, edit.getText());
         outState.putCharSequence(STATE_2, view.getText());
         outState.putCharSequence(STATE_3, control.getText());
@@ -110,7 +117,7 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
     }
 
     private synchronized void addText(final String text) {
-        final TextView view = (TextView)findViewById(R.id.textview);
+        final TextView view = (TextView) findViewById(R.id.textview);
         final CleanString toAdd = countAndRemoveBackspaces(text);
         final CharSequence existing;
 
@@ -119,7 +126,7 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
             int newlen = Math.max(0, textWithNoFEFF.length() - toAdd.backspaces);
             existing = textWithNoFEFF.subSequence(0, newlen);
         } else
-           existing = textWithNoFEFF;
+            existing = textWithNoFEFF;
 
         UiRunner lambda = (v, t, e) -> {
             v.setText(e);
@@ -131,6 +138,7 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
     interface UiRunner {
         void runonuithread(TextView view, String text1, String text2);
     }
+
     void runOnUiThread(final TextView view, final UiRunner lambda, final String text1, final String text2) {
         runOnUiThread(new Runnable() { // super
             @Override
@@ -144,7 +152,8 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
         synchronized (view) {
             try {
                 view.wait(1000);
-            } catch (InterruptedException e) {}
+            } catch (InterruptedException e) {
+            }
         }
 
     }
@@ -157,6 +166,7 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
      * the string sometimes, when a char is deleted at the end. What, do they think that no one will
      * ever notice that charSequence.length() != actualRealUsefulCharacters.length()? Why don't they
      * just use a null char? I say this is a pure bug in CharSequence. Use null!
+     *
      * @param dirty the characters that stupidly end with some number of \uFEFF chars
      * @return the normal sensible part of this text
      */
@@ -178,10 +188,11 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
     /**
      * Process incoming text and remove backspaces and the characters they are meant to delete, plus
      * count how many additional backspaces need to be used to modify other text
+     *
      * @param text the dirty string that may contain backspaces, which we need to remove
      * @return a CleanString, which is a small struct containing the actual clean string to print to the screen,
-     *          and a count of how many additional backspaces were encountered that need to be used to delete chars
-     *          already printed
+     * and a count of how many additional backspaces were encountered that need to be used to delete chars
+     * already printed
      */
     private CleanString countAndRemoveBackspaces(String text) {
         CleanString clean = new CleanString();
@@ -229,41 +240,43 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
     }
 
     private void addControlText(final String text) {
-        final TextView view = (TextView)findViewById(R.id.control_messages);
+        final TextView view = (TextView) findViewById(R.id.control_messages);
         UiRunner lambda = (v, t, e) -> v.append(t);
         runOnUiThread(view, lambda, '\n' + text, null);
     }
 
     private void setCallerText(final String text) {
-        final TextView view = (TextView)findViewById(R.id.other_party_label);
+        final TextView view = (TextView) findViewById(R.id.other_party_label);
         UiRunner lambda = (v, t, e) -> v.setText(t);
         runOnUiThread(view, lambda, text, null);
     }
 
 
-
     public void hangUp(View view) {
         texter.hangUp();
-        finish();
+        showEndCallDialog("You hung up. Do you want to save the text of this call?");
+        //finish();
     }
 
     @Override
     public void SessionClosed() {
-        addControlText("***" + otherParty + " hung up.");
+        //addControlText("***" + otherParty + " hung up.");
+        showEndCallDialog(otherParty + " hung up. Do you want to save the text of this call?");
         // TODO replace with dialog, ask to save text
-        try {
-            Thread.sleep(2000,0);
-        } catch (InterruptedException e) { }
-        finish();
+        /*try {
+            Thread.sleep(2000, 0);
+        } catch (InterruptedException e) {
+        }*/
+        //finish();
     }
 
     @Override
     public void SessionFailed(String reason) {
-        addControlText("Failed to establish call: " + reason); // TODO replace with dialog
-        try {
-            Thread.sleep(1000,0);
-        } catch (InterruptedException e) {}
-        finish();
+        showFailDialog("Failed to establish call: " + reason);
+        //try {
+        //    Thread.sleep(1000,0);
+        //} catch (InterruptedException e) {}
+        //finish();
     }
 
     @Override
@@ -286,7 +299,8 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
             screenRotated = false;
             return; // ignore text addition due to destruction and recreation of activity
         }
-        if (BuildConfig.DEBUG) Log.d(TAG, "text changed! start: " + start + " | before: " + before + " | count: " + count);
+        if (BuildConfig.DEBUG)
+            Log.d(TAG, "text changed! start: " + start + " | before: " + before + " | count: " + count);
 
         if (editOverlappedEnd(start, before, count)) {
             if (charsOnlyAppended(s, start, before, count)) {
@@ -312,10 +326,6 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
                 // we can't allow edits that occur earlier in the text, you can only edit the end
             }
         }
-        /*previousEdit = new Edit();
-        previousEdit.start = start;
-        previousEdit.before = before;
-        previousEdit.count = count;*/
     }
 
     private void sendLastWord(CharSequence now, int start, int before, int count) {
@@ -357,10 +367,10 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
         CharSequence added = now.subSequence(start + before, now.length());
         try {
             texter.sendRTTChars(added.toString());
-        } catch  (IllegalStateException e) {
+        } catch (IllegalStateException e) {
             addText("Can't send text yet - call not connected\n");
             makingManualEdit = true;
-            EditText edit = (EditText)findViewById(R.id.compose_message);
+            EditText edit = (EditText) findViewById(R.id.compose_message);
             edit.setText(null);
         }
     }
@@ -434,7 +444,7 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
 
     /**
      * Precondition: before == count
-     *
+     * <p>
      * for some reason, when spaces are added, the previous word is reported as changing, but it doesn't really,
      * so we are checking that here
      */
@@ -446,6 +456,10 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
         if (origStr.regionMatches(start, changed, 0, before))
             return false;
         return true;
+    }
+
+    public void saveText(View view) {
+
     }
 
     @Override
@@ -461,7 +475,33 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener, 
         }
 
     }
+
+    private void showFailDialog(String message) {
+        FailDialog dialog = FailDialog.newInstance(message);
+        dialog.show(getFragmentManager(), "error");
+    }
+
+    private void showEndCallDialog(String message) {
+        CallEndDialog dialog = CallEndDialog.newInstance(message);
+        dialog.show(getFragmentManager(), "call end");
+    }
+
+
+    @Override
+    public synchronized void dialogFail() {
+        finish();
+    }
+
+    @Override
+    public void dialogDismissed() {
+        // called from the end-of-call save-text dialog when choosing "No" to saving text
+        finish();
+    }
+
+    @Override
+    public synchronized void dialogSaveText() {
+        saveText(null);
+        finish();
+    }
+
 }
-
-
-

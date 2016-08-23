@@ -6,12 +6,12 @@ import android.app.Dialog;
 import android.content.DialogInterface;
 import android.os.Bundle;
 
-public class FailDialog extends ErrorDialog {
+public class FailDialog extends AbstractDialog {
     QuitDialogListener quitter;
 
     public static FailDialog newInstance(String message) {
         FailDialog dialog = new FailDialog();
-        return (FailDialog)ErrorDialog.newInstance(message, dialog);
+        return (FailDialog) AbstractDialog.newInstance(message, dialog);
     }
 
     @Override

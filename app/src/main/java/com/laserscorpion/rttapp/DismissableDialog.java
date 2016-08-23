@@ -5,11 +5,11 @@ import android.app.Dialog;
 import android.content.DialogInterface;
 import android.os.Bundle;
 
-public class DismissableDialog extends ErrorDialog {
+public class DismissableDialog extends AbstractDialog {
 
     public static DismissableDialog newInstance(String message) {
         DismissableDialog dialog = new DismissableDialog();
-        return (DismissableDialog)ErrorDialog.newInstance(message, dialog);
+        return (DismissableDialog) AbstractDialog.newInstance(message, dialog);
     }
 
     @Override

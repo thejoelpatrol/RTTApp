@@ -4,12 +4,12 @@ import android.app.Activity;
 import android.app.DialogFragment;
 import android.os.Bundle;
 
-public abstract class ErrorDialog extends DialogFragment {
+public abstract class AbstractDialog extends DialogFragment {
     protected static final String KEY = "error dialog arg";
     protected String message;
     protected DialogListener listener;
 
-    public static ErrorDialog newInstance(String message, ErrorDialog subClassInstance) {
+    public static AbstractDialog newInstance(String message, AbstractDialog subClassInstance) {
         Bundle args = new Bundle();
         args.putString(KEY, message);
         subClassInstance.setArguments(args);
