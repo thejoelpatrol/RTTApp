@@ -37,7 +37,7 @@ public class TextEntryMonitor implements TextWatcher {
     private boolean makingManualEdit = false;
     private boolean needManualEdit = false; // flag that indicates that we need to undo the text change the user made - not allowed to edit earlier text
     private boolean screenRotated = false;
-    private boolean useRealTimeText;
+    private boolean useRealTimeText; // real-time char-by-char mode vs. en bloc mode
 
     /**
      *
@@ -59,7 +59,8 @@ public class TextEntryMonitor implements TextWatcher {
 
     /**
      * This is the bulk of the logic to determine which characters to send to the other party when the user enters text.
-     * If useRealTimeText == false, these listener methods are never called.
+     * If useRealTimeText == false, these listener methods are never called. In turn, most methods total are never
+     * called. En bloc methods are at the end of the class.
      */
     @Override
     public synchronized void onTextChanged(CharSequence s, int start, int before, int count) {
@@ -98,6 +99,27 @@ public class TextEntryMonitor implements TextWatcher {
                 // we can't allow edits that occur earlier in the text, you can only edit the end
             }
         }
+    }
+
+    @Override
+    public synchronized void beforeTextChanged(CharSequence s, int start, int count, int after) {
+        if (makingManualEdit)
+            return;
+        currentText = s.subSequence(0, s.length()); // deep copy the text before it is changed so we can compare before and after the edit
+    }
+
+    @Override
+    public synchronized void afterTextChanged(Editable s) {
+        if (needManualEdit) {
+            makingManualEdit = true;
+            needManualEdit = false;
+            s.replace(0, s.length(), currentText);
+            if (BuildConfig.DEBUG) Log.d(TAG, "initiating replacement to undo prohibited edit");
+        }
+        if (makingManualEdit) {
+            makingManualEdit = false;
+        }
+
     }
 
     private void sendLastWord(CharSequence now, int start, int before, int count) {
@@ -222,27 +244,22 @@ public class TextEntryMonitor implements TextWatcher {
             return false;
         return true;
     }
+    /*
+     * end RTT methods ... following methods are for en bloc mode
+     */
+    
 
-    @Override
-    public synchronized void beforeTextChanged(CharSequence s, int start, int count, int after) {
-        if (makingManualEdit)
-            return;
-        currentText = s.subSequence(0, s.length()); // deep copy the text before it is changed so we can compare before and after the edit
-    }
-
-    @Override
-    public synchronized void afterTextChanged(Editable s) {
-        if (needManualEdit) {
-            makingManualEdit = true;
-            needManualEdit = false;
-            s.replace(0, s.length(), currentText);
-            if (BuildConfig.DEBUG) Log.d(TAG, "initiating replacement to undo prohibited edit");
+    /**
+     * Used in the case when the user has chosen to send entire messages, not individual characters,
+     * i.e. en bloc mode. The text in the field is sent to the other party and removed from the field.
+     */
+    public void checkAndSend() {
+        CharSequence text = fieldToMonitor.getText();
+        if (text.length() > 0) {
+            String toSend = text.toString() + '\n';
+            texter.sendRTTChars(toSend);
+            fieldToMonitor.setText(null);
         }
-        if (makingManualEdit) {
-            makingManualEdit = false;
-        }
-
     }
-
 
 }
