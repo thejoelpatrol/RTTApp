@@ -77,13 +77,33 @@
             android:maxLines="10"
             android:scrollbars="vertical"
             android:gravity="top" />
-        <EditText
-            android:id="@+id/compose_message"
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_below="@id/textview"
+            android:layout_height="wrap_content"
             android:layout_weight=".20"
-            android:hint="Your text"/>
+            android:orientation="horizontal">
+            <EditText
+                android:id="@+id/compose_message"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/textview"
+                android:layout_weight=".90"
+                android:layout_alignParentTop="true"
+                android:hint="Your text"/>
+            <Button
+                android:id="@+id/sendButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentTop="true"
+                android:layout_toRightOf="@id/compose_message"
+                android:background="@drawable/button_blue"
+                android:textColor="#ffffff"
+                android:layout_margin="10dp"
+                android:text="Send"
+                android:onClick="sendText"
+                android:visibility="invisible"/>
+
+        </LinearLayout>
 
     </LinearLayout>
 

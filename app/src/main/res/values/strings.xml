@@ -11,9 +11,11 @@
     <string name="pref_registrar">Registrar/server IP</string>
     <string name="pref_username">Username</string>
     <string name="pref_password">Password</string>
+    <string name="pref_use_realtime">Send text in real time?</string>
     <string name="pref_username_qualified">com.laserscorpion.rttapp.pref_username</string>
     <string name="pref_registrar_qualified">com.laserscorpion.rttapp.pref_registrar</string>
     <string name="pref_password_qualified">com.laserscorpion.rttapp.pref_password</string>
+    <string name="pref_use_realtime_qualified">com.laserscorpion.rttapp.pref_use_realtime</string>
     <string name="title_activity_rttcall">RTTCallActivity</string>
     <string name="title_activity_rttregistration">RTTRegistrationActivity</string>
     <string name="title_activity_scrolling">ScrollingActivity</string>

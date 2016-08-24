@@ -15,40 +15,51 @@ import java.util.Arrays;
 /**
  * The TextEntryMonitor, one of which is created by the RTTCallActivity at a time,
  * listens for input on the user's text field (EditText), and keeps track of which
- * characters have changed. If text is added or deleted at the end, it tells the SipClient to send
+ * characters have changed.
+ *
+ * There are two modes, real time and en bloc, specified in the constructor.
+ *
+ * Real-time mode:
+ * If text is added or deleted at the end, TextEntryMonitor tells the SipClient to send
  * the new characters (possibly '\d') in the real-time call. If edits are made earlier in the text,
  * it undoes them, since the user is not allowed to add or remove text anywhere besides the
  * end of the field.
+ *
+ * En bloc mode:
+ * Text is not sent character by character. It is only sent as complete messages, when checkAndSend()
+ * is called.
  */
 public class TextEntryMonitor implements TextWatcher {
     private static final String TAG = "TextWatcher";
-    private Context parent;
     private EditText fieldToMonitor;
     private CharSequence currentText;
     private SipClient texter;
     private boolean makingManualEdit = false;
     private boolean needManualEdit = false; // flag that indicates that we need to undo the text change the user made - not allowed to edit earlier text
     private boolean screenRotated = false;
+    private boolean useRealTimeText;
 
     /**
      *
-     * @param context probably the Activity whose EditText we are watching
      * @param watchThis the text field to monitor for changes
+     * @param realTime whether the text should be sent in real time, character by character, or only when checkAndSend() is called
      * @param sipClient the global hub for all things SIP, and who is responsible for sending the real-time text chars
      * @param startText initial text to populate the field with, to be ignored (likely put there because the activity is destroyed and recreated)
      * @param screenRotated whether this new TextEntryMonitor is being created due to screen rotation, i.e. the activity is destroyed and recreated
      */
-    public TextEntryMonitor(Context context, EditText watchThis, SipClient sipClient, CharSequence startText, boolean screenRotated) {
-        parent = context;
+    public TextEntryMonitor(EditText watchThis, boolean realTime, SipClient sipClient, CharSequence startText, boolean screenRotated) {
         fieldToMonitor = watchThis;
-        fieldToMonitor.addTextChangedListener(this);
+        useRealTimeText = realTime;
+        if (useRealTimeText)
+            fieldToMonitor.addTextChangedListener(this);
         currentText = startText;
         texter = sipClient;
         this.screenRotated = screenRotated;
     }
 
     /**
-     * This is the bulk of the logic to determine which characters to send to the other party when the user enters text
+     * This is the bulk of the logic to determine which characters to send to the other party when the user enters text.
+     * If useRealTimeText == false, these listener methods are never called.
      */
     @Override
     public synchronized void onTextChanged(CharSequence s, int start, int before, int count) {

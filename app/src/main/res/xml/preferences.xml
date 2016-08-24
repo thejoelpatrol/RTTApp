@@ -11,5 +11,11 @@
     <EditTextPreference
         android:key="@string/pref_password_qualified"
         android:title="@string/pref_password" />
+    <SwitchPreference
+        android:key="@string/pref_use_realtime_qualified"
+        android:title="@string/pref_use_realtime"
+        android:summaryOn="Send characters as they are entered"
+        android:summaryOff="Send text only after hitting the 'Send' button"
+        android:defaultValue="true"/>
 
 </PreferenceScreen>

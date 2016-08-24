@@ -1,6 +1,8 @@
 package com.laserscorpion.rttapp.ui;
 
+import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.text.method.ScrollingMovementMethod;
@@ -8,6 +10,7 @@ import android.util.Log;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
 
@@ -58,6 +61,13 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener,
         setTitle("Call with " + otherParty);
         addControlText("Status:");
 
+        SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(this);
+        boolean useRealTime = pref.getBoolean(getString(R.string.pref_use_realtime_qualified), true);;
+        if (!useRealTime) {
+            Button send = (Button)findViewById(R.id.sendButton);
+            send.setVisibility(View.VISIBLE);
+        }
+
         if (savedInstanceState != null) {
             CharSequence currentText = savedInstanceState.getCharSequence(STATE_1);
             CharSequence receivedText = savedInstanceState.getCharSequence(STATE_2);
@@ -65,9 +75,9 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener,
             CharSequence controlText = savedInstanceState.getCharSequence(STATE_3);
             control.setText(controlText);
             setCallerText(otherParty + " says:");
-            textHandler = new TextEntryMonitor(this, edit, texter, currentText, true);
+            textHandler = new TextEntryMonitor(edit, useRealTime, texter, currentText, true);
         } else {
-            textHandler = new TextEntryMonitor(this, edit, texter, null, false);
+            textHandler = new TextEntryMonitor(edit, useRealTime, texter, null, false);
         }
 
         Window window = getWindow();
@@ -257,7 +267,19 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener,
         showFailDialog("Failed to establish call: " + reason);
     }
 
-
+    /**
+     * Only used in the case where the user has chosen to send text en bloc rather than
+     * character-by-character (for example, if they don't trust AutoCorrect). This is determined
+     * at activity creation time by the preference com.laserscorpion.rttapp.pref_use_realtime
+     * When the user presses the "Send" button, this method is called, and the text they have
+     * entered is removed from the text entry field and sent by the TextEntryWatcher, due to the
+     * call here. Basically, the purpose of this method is to pass the button signal along to the
+     * TextEntryWatcher.
+     * @param view
+     */
+    public void sendText(View view) {
+        //textHandler.checkAndSend();
+    }
 
     public void saveText(View view) {
 
