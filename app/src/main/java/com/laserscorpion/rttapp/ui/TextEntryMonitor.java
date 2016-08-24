@@ -7,7 +7,6 @@ import android.util.Log;
 import android.widget.EditText;
 
 import com.laserscorpion.rttapp.BuildConfig;
-import com.laserscorpion.rttapp.R;
 import com.laserscorpion.rttapp.sip.SipClient;
 
 import java.nio.charset.StandardCharsets;
@@ -31,6 +30,14 @@ public class TextEntryMonitor implements TextWatcher {
     private boolean needManualEdit = false; // flag that indicates that we need to undo the text change the user made - not allowed to edit earlier text
     private boolean screenRotated = false;
 
+    /**
+     *
+     * @param context probably the Activity whose EditText we are watching
+     * @param watchThis the text field to monitor for changes
+     * @param sipClient the global hub for all things SIP, and who is responsible for sending the real-time text chars
+     * @param startText initial text to populate the field with, to be ignored (likely put there because the activity is destroyed and recreated)
+     * @param screenRotated whether this new TextEntryMonitor is being created due to screen rotation, i.e. the activity is destroyed and recreated
+     */
     public TextEntryMonitor(Context context, EditText watchThis, SipClient sipClient, CharSequence startText, boolean screenRotated) {
         parent = context;
         fieldToMonitor = watchThis;

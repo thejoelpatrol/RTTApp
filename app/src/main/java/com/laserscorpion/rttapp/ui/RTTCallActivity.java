@@ -24,12 +24,6 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener,
                                                                     AbstractDialog.DialogListener,
                                                                     CallEndDialog.SaveDialogListener {
 
-    private class Edit {
-        public int start;
-        public int before;
-        public int count;
-    }
-
     private class CleanString {
         public int backspaces = 0;
         public String str = new String();
@@ -39,9 +33,7 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener,
     private static final String STATE_1 = "currentText";
     private static final String STATE_2 = "receivedText";
     private static final String STATE_3 = "controlText";
-    private static final String STATE_4 = "controlText";
     private SipClient texter;
-    private Edit previousEdit;
     private String otherParty;
     TextEntryMonitor textHandler; // this watches text input and sends the RTT chars
 
