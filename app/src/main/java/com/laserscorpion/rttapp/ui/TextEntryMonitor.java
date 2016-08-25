@@ -23,7 +23,8 @@ import java.util.Arrays;
  * If text is added or deleted at the end, TextEntryMonitor tells the SipClient to send
  * the new characters (possibly '\d') in the real-time call. If edits are made earlier in the text,
  * it undoes them, since the user is not allowed to add or remove text anywhere besides the
- * end of the field.
+ * end of the field. Keeping track of these edits is pretty annoying, and you need to understand how
+ * the Android.text.TextWatcher interface works before touching any of this.
  *
  * En bloc mode:
  * Text is not sent character by character. It is only sent as complete messages, when checkAndSend()
@@ -58,9 +59,17 @@ public class TextEntryMonitor implements TextWatcher {
     }
 
     /**
-     * This is the bulk of the logic to determine which characters to send to the other party when the user enters text.
+     * onTextChanged is the bulk of the logic to determine which characters to send to the other party when the user enters text.
      * If useRealTimeText == false, these listener methods are never called. In turn, most methods total are never
-     * called. En bloc methods are at the end of the class.
+     * called. En bloc methods are at the end of the class. This method enforces the rule that the
+     * user may only enter and delete text at the end of the field, not earlier (as in SipCon1).
+     *
+     * The important thing to know here is that in beforeTextChanged, we set currentText to the
+     * text in the field before the change occurs. Then, in onTextChanged, s is the *new* text and
+     * currentText is the *old* text. If we edit the text programmatically (e.g. to undo a prohibited
+     * edit), these callbacks fire, so they need to know if they are being invoked due to a change
+     * made by this code, not by the user. Thus we have the flag makingManualEdit, which is set in
+     * afterTextChanged, if it sees the flag needManualEdit.
      */
     @Override
     public synchronized void onTextChanged(CharSequence s, int start, int before, int count) {

@@ -115,6 +115,11 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener,
         super.onSaveInstanceState(outState);
     }
 
+    /**
+     * add text to the other party's incoming text field, i.e. the main text area. If you don't jump
+     * through some hoops involving runOnUiThread(), you never really know when it will be displayed
+     * @param text
+     */
     private synchronized void addText(final String text) {
         final TextView view = (TextView) findViewById(R.id.textview);
         final CleanString toAdd = countAndRemoveBackspaces(text);
@@ -151,8 +156,7 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener,
         synchronized (view) {
             try {
                 view.wait(1000);
-            } catch (InterruptedException e) {
-            }
+            } catch (InterruptedException e) {}
         }
 
     }
@@ -217,8 +221,8 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener,
             clean.backspaces = initialBS + additionalBS;
         else
             clean.backspaces = initialBS;
-        if (BuildConfig.DEBUG) Log.d(TAG, "bs: " + clean.backspaces);
-        if (BuildConfig.DEBUG) Log.d(TAG, "adding: " + clean.str);
+        //if (BuildConfig.DEBUG) Log.d(TAG, "bs: " + clean.backspaces);
+        //if (BuildConfig.DEBUG) Log.d(TAG, "adding: " + clean.str);
         return clean;
     }
 
@@ -274,7 +278,8 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener,
      * When the user presses the "Send" button, this method is called, and the text they have
      * entered is removed from the text entry field and sent by the TextEntryWatcher, due to the
      * call here. Basically, the purpose of this method is to pass the button signal along to the
-     * TextEntryWatcher.
+     * TextEntryWatcher. It can only be called if the Send button is visible, which occurs when the
+     * preference is set.
      * @param view
      */
     public void sendText(View view) {
