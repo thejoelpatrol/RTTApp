@@ -111,6 +111,12 @@ public class IncomingCallActivity extends AppCompatActivity implements SessionLi
         // close() called from within dialog box handler
     }
 
+    @Override
+    public void SessionDisconnected(String reason) {
+        stopVibrating();
+        showFailDialog("Call failed: " + reason);
+    }
+
     private void showFailDialog(String message) {
         DismissableDialog dialog = DismissableDialog.newInstance(message);
         dialog.show(getFragmentManager(), "error");

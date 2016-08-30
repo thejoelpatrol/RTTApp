@@ -10,5 +10,5 @@ public interface SessionListener extends EventListener {
     void SessionEstablished(String userName);
     void SessionClosed();
     void SessionFailed(String reason);
-
+    void SessionDisconnected(String reason);
 }

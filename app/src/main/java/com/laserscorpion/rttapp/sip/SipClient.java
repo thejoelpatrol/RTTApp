@@ -186,17 +186,12 @@ public class SipClient implements SipListener, ConnectivityReceiver.IPChangeList
             if (oldIP == null || !oldIP.equals(localIP)) {
                 if (sipStack != null) {
                     // assumption: if sipStack != null, neither is addressFactory, headerFactory, etc
-                    if (!onACallNow()) {
-                        // do not delete the socket we are current using to handle signalling for this call
-                        // if our IP address is changing during a call...well...the call will die, for one thing
-                        // that...might be a tricky case
-                        if (listeningPoint != null) {
-                            sipProvider.removeListeningPoint(listeningPoint);
-                            sipStack.deleteListeningPoint(listeningPoint);
-                        }
-                        listeningPoint = sipStack.createListeningPoint(localIP, port, protocol);
-                        sipProvider.addListeningPoint(listeningPoint);
+                    if (listeningPoint != null) {
+                        sipProvider.removeListeningPoint(listeningPoint);
+                        sipStack.deleteListeningPoint(listeningPoint);
                     }
+                    listeningPoint = sipStack.createListeningPoint(localIP, port, protocol);
+                    sipProvider.addListeningPoint(listeningPoint);
                     Address localSipAddress = addressFactory.createAddress("sip:" + username + "@" + localIP + ":" + listeningPoint.getPort());
                     localContactHeader = headerFactory.createContactHeader(localSipAddress);
                 }
@@ -381,6 +376,12 @@ public class SipClient implements SipListener, ConnectivityReceiver.IPChangeList
             listener.SessionClosed();
         }
     }
+    private void notifySessionDisconncted(String reason) {
+        for (SessionListener listener : sessionReceivers) {
+            listener.SessionDisconnected(reason);
+        }
+    }
+
 
     private void notifySessionEstablished() {
         //Log.d(TAG, "Notifying that call is connected");
@@ -1155,6 +1156,10 @@ public class SipClient implements SipListener, ConnectivityReceiver.IPChangeList
                 // IPChangeListener calling IPAddrChanged does not actually mean it changed
                 sendControlMessage("Network changed, reregistering");
                 register();
+                if (onACallNow()) {
+                    hangUp();
+                    notifySessionDisconncted("IP address changed, call lost");
+                }
             }
         } catch (SipException e) {
             sendControlMessage("Error: troubling re-finding own IP ... connection possibly lost");

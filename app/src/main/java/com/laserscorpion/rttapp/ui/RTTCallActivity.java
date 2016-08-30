@@ -271,6 +271,11 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener,
         showFailDialog("Failed to establish call: " + reason);
     }
 
+    @Override
+    public void SessionDisconnected(String reason) {
+        showEndCallDialog("Call disconnected: " + reason + ". \n\nDo you want to saved the text of this call?");
+    }
+
     /**
      * Only used in the case where the user has chosen to send text en bloc rather than
      * character-by-character (for example, if they don't trust AutoCorrect). This is determined

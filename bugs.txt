@@ -19,7 +19,6 @@ UI deficiencies
 -make sure app continues running in bg - consider adding a service?
 -use display name, not just sip uri
 -landscape mode in call doesn't look good
--end call when IP address changes (detect dropped call)
 -text saving doesn't do anything
 
 
