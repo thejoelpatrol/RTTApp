@@ -2,12 +2,10 @@
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
     <EditTextPreference
         android:key="@string/pref_registrar_qualified"
-        android:title="@string/pref_registrar"
-        android:defaultValue="192.168.1.101" />
+        android:title="@string/pref_registrar" />
     <EditTextPreference
         android:key="@string/pref_username_qualified"
-        android:title="@string/pref_username"
-        android:defaultValue="1000" />
+        android:title="@string/pref_username" />
     <EditTextPreference
         android:key="@string/pref_password_qualified"
         android:title="@string/pref_password" />

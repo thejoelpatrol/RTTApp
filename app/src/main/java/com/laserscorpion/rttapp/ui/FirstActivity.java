@@ -6,6 +6,7 @@ import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.util.Log;
 import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -19,17 +20,32 @@ public class FirstActivity extends AppCompatActivity {
     public static final String TAG = "RTTApp";
     private String REGISTRAR_PREF_NAME; // these are basically constants
     private String SIP_USER_PREF_NAME;
+    private String SIP_PASSWORD_PREF_NAME;
+    private boolean launchedOnce = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         REGISTRAR_PREF_NAME = getString(R.string.pref_registrar_qualified);
         SIP_USER_PREF_NAME = getString(R.string.pref_username_qualified);
+        SIP_PASSWORD_PREF_NAME = getString(R.string.pref_password_qualified);
 
         setContentView(R.layout.activity_first);
         PreferenceManager.setDefaultValues(this, R.xml.preferences, true);
         Toolbar myToolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(myToolbar);
+
+        if (!launchedOnce) {
+            // automatically show other activities only once
+            // after that, the user has already interacted with the app and made changes,
+            // so they may want to be on this screen
+            if (prefsAreSet()) {
+                doRegister();
+            } else {
+                launchSettings();
+            }
+            launchedOnce = true;
+        }
     }
 
     @Override
@@ -39,6 +55,17 @@ public class FirstActivity extends AppCompatActivity {
         serverField.setText(getRegistrar());
         TextView user = (TextView)findViewById(R.id.sip_username);
         user.setText(getUsername() + "@");
+    }
+
+    private boolean prefsAreSet() {
+        String registrar = getRegistrar();
+        String username = getUsername();
+        String password = getPassword();
+        if (registrar.equals("") || username.equals("") || password.equals(""))
+            return false;
+        return true;
+        //Log.e(TAG, registrar + ":" + username + ":" + password);
+        //return registrar != null && username != null && password != null;
     }
 
     @Override
@@ -56,8 +83,17 @@ public class FirstActivity extends AppCompatActivity {
         return pref.getString(SIP_USER_PREF_NAME, "fail");
     }
 
+    private String getPassword() {
+        SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(this);
+        return pref.getString(SIP_PASSWORD_PREF_NAME, "fail");
+    }
+
     public void register(View view) {
         setServerPref();
+        doRegister();
+    }
+
+    private void doRegister() {
         Intent intent = new Intent(this, RTTRegistrationActivity.class);
         startActivity(intent);
     }

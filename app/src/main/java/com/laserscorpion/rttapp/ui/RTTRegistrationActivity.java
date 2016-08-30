@@ -68,6 +68,18 @@ public class RTTRegistrationActivity extends AppCompatActivity implements TextLi
     }
 
     @Override
+    protected void onRestart() {
+        // onRestart may be called after changing settings, so make sure credentials are up to date with the SipClient
+        super.onRestart();
+        try {
+            texter.reset(this, getUsername(), getRegistrar(), getPassword(), this);
+        } catch (SipException e) {
+            Log.e(TAG, "Failed to initialize SIP stack", e);
+            showFailDialog(e.getMessage());
+        }
+    }
+
+    @Override
     protected void onStop() {
         super.onStop();
         if (texter != null)

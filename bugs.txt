@@ -11,13 +11,11 @@ bugs
 -taking word suggestion of built-in keyboard popup is fatal - how to cause this to appear? i don't see that popup any more
 -observed a crash declining a call after receiving a DialogTerminated message, or maybe it was in responding to a second incoming call when one was already incoming?
 	-then after this crash, java.lang.IllegalStateException: Singleton SipClient has not been initialized yet - init() before getInstance()
--occasional text deletion problem that leaves too many chars intact? very hard to trigger, POSSIBLY fixed by removing \uFEFF from text upon every addition
 -handle in-dialog INVITEs
 
 
 UI deficiencies
 -log in RegistrationActivity is probably not useful
--Maybe FirstActivity is the one that isn't useful? Register automatically if credentials exist?
 -make sure app continues running in bg - consider adding a service?
 -use display name, not just sip uri
 -landscape mode in call doesn't look good
