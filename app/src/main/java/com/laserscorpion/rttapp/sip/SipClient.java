@@ -150,6 +150,9 @@ public class SipClient implements SipListener, ConnectivityReceiver.IPChangeList
             localContactHeader = headerFactory.createContactHeader(localSipAddress);
             allowHeader = headerFactory.createAllowHeader(TextUtils.join(", ", ALLOWED_METHODS));
             maxForwardsHeader = headerFactory.createMaxForwardsHeader(MAX_FWDS);
+        } catch (ParseException e) {
+            parent.unregisterReceiver(connectivityReceiver);
+            throw new SipException("Error: could not parse SIP address (" + username + "@" + server +")", e);
         } catch (Exception e) {
             parent.unregisterReceiver(connectivityReceiver);
             throw new SipException("Error: could not create SIP stack", e);
@@ -432,7 +435,7 @@ public class SipClient implements SipListener, ConnectivityReceiver.IPChangeList
                 // get() waits on the other thread that is sending the request
                 // doing this in another thread doesn't seem to make sense if we are waiting on get()
                 // maybe disable Android's strict mode to allow network on main thread?
-                sendControlMessage("Sent registration request");
+                //sendControlMessage("Sent registration request");
                 registrationPending = true;
             } else {
                 Log.e(TAG, "Failed to register: " + result);
@@ -1135,7 +1138,7 @@ public class SipClient implements SipListener, ConnectivityReceiver.IPChangeList
     public void IPAddrChanged() {
         try {
             String oldIP = localIP;
-            if (BuildConfig.DEBUG) Log.d(TAG, "Resetting IP due to connectivity change, reregistering");
+            if (BuildConfig.DEBUG) Log.d(TAG, "Resetting IP due to connectivity change");
             if (BuildConfig.DEBUG) Log.d(TAG, "current IP: " + localIP);
             resetLocalIP();
             if (BuildConfig.DEBUG) Log.d(TAG, "new IP: " + localIP);
@@ -1148,8 +1151,11 @@ public class SipClient implements SipListener, ConnectivityReceiver.IPChangeList
                 } catch (InterruptedException e) {}
                 resetLocalIP();
             }
-            sendControlMessage("Network changed, reregistering");
-            register();
+            if (!oldIP.equals(localIP)) {
+                // IPChangeListener calling IPAddrChanged does not actually mean it changed
+                sendControlMessage("Network changed, reregistering");
+                register();
+            }
         } catch (SipException e) {
             sendControlMessage("Error: troubling re-finding own IP ... connection possibly lost");
         }
