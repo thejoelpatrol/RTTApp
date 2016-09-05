@@ -80,6 +80,7 @@ public class RTTCall {
      * @param transaction used to send 180 Ringing, and the final response. null if no 180 has been
      *                    sent yet and therefore no transaction is used yet. In that case, only
      *                    one response can be sent,
+     * @param messageReceivers the TextListeners that need to be notified when there is incoming text
      */
     public RTTCall(RequestEvent requestEvent, ServerTransaction transaction, List<TextListener> messageReceivers) {
         this(requestEvent.getRequest(), requestEvent.getDialog(), messageReceivers);
@@ -94,7 +95,8 @@ public class RTTCall {
      * created for the call, but this may not be available yet,
      * so you will need to call addDialog() in that case.
      * @param creationRequest the INVITE Request sent to the other party to initiate the call
-     * @param dialog
+     * @param dialog the dialog that is already created for the call, or null if none yet
+     * @param messageReceivers the TextListeners that need to be notified when there is incoming text
      */
     public RTTCall(Request creationRequest, Dialog dialog, List<TextListener> messageReceivers) {
         this.creationRequest = creationRequest;
@@ -187,7 +189,7 @@ public class RTTCall {
      * @param remotePort the port of the remote party for the RTP stream
      * @param localRTPPort the local port to be used for the RTP stream
      * @param t140MapNum the RTP payload map number corresponding to t140 in the agreed session description
-     * @param t140RedMapNum must be <= 0 if not using redundancy! This is the RTP payload map number corresponding to
+     * @param t140RedMapNum must be &lt;= 0 if not using redundancy! This is the RTP payload map number corresponding to
      *                      "red", the redundant media type, in the agreed session description
      * @throws IllegalStateException if no call is currently ringing
      * @throws RtpException if the call can't be connected
@@ -204,7 +206,7 @@ public class RTTCall {
      * @param remotePort the port of the remote party for the RTP stream
      * @param localRTPPort the local port to be used for the RTP stream
      * @param t140MapNum the RTP payload map number corresponding to t140 in the agreed session description
-     * @param t140RedMapNum must be <= 0 if not using redundancy! This is the RTP payload map number corresponding to
+     * @param t140RedMapNum must be &lt;= 0 if not using redundancy! This is the RTP payload map number corresponding to
      *                      "red", the redundant media type, in the agreed session description
      * @throws IllegalStateException if no call is currently outgoing
      * @throws RtpException if the call can't be connected
