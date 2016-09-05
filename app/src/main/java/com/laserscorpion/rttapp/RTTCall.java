@@ -35,6 +35,43 @@ import se.omnitor.protocol.rtp.packets.RTPPacket;
 import se.omnitor.protocol.rtp.text.SyncBuffer;
 import se.omnitor.util.*;
 
+/**
+ * RTTcall is one of the core classes, establishing the RTP session and interfacing with Omnitor's
+ * RFC 4103 implementation. It communicates in both directions with the layers above and below, amd
+ * coordinates the two RTP libraries underneath (JRTP and Omnitor t140).  It receives information
+ * from the SIP layer above about how to set up the call, and then initiates the RTP session.
+ * It then continuously receives text input from above, which it places into the Omnitor buffer, to
+ * be sent by the lower layer. It also listens for incoming RT text from Omnitor's library, and
+ * passes it up to any TextListeners that are registered with it (this may be something of a layer
+ * violation, though TextListener is within the SIP package).
+ *
+ * <code>
+ * <br>    --------------
+ * <br>    |&nbsp; UI layer&nbsp;&nbsp;|
+ * <br>    --------------
+ * <br>    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|
+ * <br>    --------------
+ * <br>    | SIP layer &nbsp;| &nbsp;(SipClient)
+ * <br>    --------------
+ * <br>    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|
+ * <br>    <strong>--------------
+ * <br>    | Call layer | &nbsp;(RTTCall)
+ * <br>    --------------</strong>
+ * <br>    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|
+ * <br>    --------------
+ * <br>    | RTP layer &nbsp;| &nbsp;(JRTP, Omnitor t140)
+ * <br>    --------------
+ * </code>
+ * <br>
+ * RTTCall stores the state of one call at a time, which can be calling (outgoing),
+ * ringing (incoming), connected, or ended.  A new one should be created for each logical
+ * call, since each one needs its own new RTP session. Since the state transitions are caused by
+ * user interaction or SIP messages, the upper layer needs to tell RTTCall when to change state, by
+ * calling methods such as setRinging(). State changes span layers to some extent, so the RTTCall
+ * stores some SIP requests and events involved in its own creation, for later reference when the
+ * SIP layer is sending messages within dialogs or transactions. The upper layer may therefore
+ * need to call such methods as getInviteTransaction() or getCreationEvent().
+ */
 public class RTTCall {
     private static final String TAG = "RTTCall";
     private static final int RFC4103_BUFFER_TIME = 300;
@@ -72,8 +109,8 @@ public class RTTCall {
     private List<TextListener> messageReceivers;
 
     /**
-     * Use this constructor for an incoming call - the requestEvent is the INVITE,
-     * the transaction is the ServerTransaction used to respond to the INVITE,
+     * Use this constructor for an incoming call. The requestEvent is the incoming INVITE.
+     * The transaction is the ServerTransaction used to respond to the INVITE,
      * for both 180 Ringing and the final response. If planning to send 180 Ringing,
      * it must be sent already, so the ServerTransaction can be used here.
      * @param requestEvent the incoming INVITE event
@@ -95,7 +132,7 @@ public class RTTCall {
      * created for the call, but this may not be available yet,
      * so you will need to call addDialog() in that case.
      * @param creationRequest the INVITE Request sent to the other party to initiate the call
-     * @param dialog the dialog that is already created for the call, or null if none yet
+     * @param dialog the dialog that is already created for the call is available, or null if none yet
      * @param messageReceivers the TextListeners that need to be notified when there is incoming text
      */
     public RTTCall(Request creationRequest, Dialog dialog, List<TextListener> messageReceivers) {
@@ -117,7 +154,9 @@ public class RTTCall {
     }
 
     /**
-     *
+     * Get the ServerTransaction from the original INVITE dialog of an incoming call.
+     * This is useful when the transaction needs to be used in responding to the INVITE,
+     * which will likely happen well after it is initially received.
      * @return the transaction used to respond to the original INVITE, or null if none
      */
     public ServerTransaction getInviteTransaction() {
@@ -125,7 +164,8 @@ public class RTTCall {
     }
 
     /**
-     *
+     * Get the ClientTransaction from the original INVITE dialog of an outgoing call.
+     * This is useful when the transaction needs to be used again in cancelling the INVITE.
      * @return the transaction used to send the original INVITE, or null if none
      */
     public ClientTransaction getInviteClientTransaction() {
@@ -134,16 +174,16 @@ public class RTTCall {
 
 
     /**
-     * Used to change the Dialog associated with the call, especially if one was not
-     * available at creation of the RTTCall
-     * @param dialog the new Dialog to associate with the call
+     * Use this to change the Dialog associated with the call, especially if one was not
+     * available at creation of the RTTCall.
+     * @param dialog the new Dialog to associate with the call,
      */
     public synchronized void addDialog(Dialog dialog) {
         this.dialog = dialog;
     }
 
     /**
-     * Used to change the ClientTransaction that was used to send the original INVITE request
+     * Use this to change the ClientTransaction that was used to send the original INVITE request
      * e.g. when sending that INVITE, or when sending another INVITE after authenticating
      * @param transaction the new ClientTransaction to associate with the call
      */
@@ -151,12 +191,19 @@ public class RTTCall {
         this.inviteClientTransaction = transaction;
     }
 
-
+    /**
+     * Replace the existing list of TextListeners with the new one, if the list of current activities
+     * changes.
+     * @param messageReceivers the new TextListeners
+     */
     public synchronized void resetMessageReceivers(List<TextListener> messageReceivers) {
        this.messageReceivers = messageReceivers;
     }
 
     /**
+     * This method returns the incoming RequestEvent that created the call, if any. This is useful
+     * in connecting the call. We need to store that event somewhere, since the call completion can
+     * only come after user interaction, which will take quite a while after the SIP event is received.
      * Precondition: call was created by an incoming RequestEvent. If call
      * was created by an outgoing request, will return null.
      * @return the incoming event that created the call, or null
@@ -164,27 +211,58 @@ public class RTTCall {
     public RequestEvent getCreationEvent() {
         return incomingRequest;
     }
+
+    /**
+     * This method returns the outgoing Request that created the call, if any. This
+     * Precondition: call was created by an outgoing Request. If call
+     * was created by an incoming request, will return null.
+     * @return the outgoing Request that was sent to the other party when the call was created, if any
+     */
     public Request getCreationRequest() {
         return creationRequest;
     }
+
+    /**
+     * Get the dialog for an ongoing connected call, so as to send more messages in that dialog,
+     * for example when sending BYE.
+     * @return the dialog for the established call
+     */
     public Dialog getDialog() {
         return dialog;
     }
 
+    /**
+     * This is not a true equals() override, since it does not compare
+     * arbitrary objects. It can only be called to check equality of
+     * RTTCalls, which is based on the requests that create them.
+     */
     public boolean equals(RTTCall otherCall) {
         Request newRequest = otherCall.getCreationRequest();
         return newRequest.equals(creationRequest);
     }
 
+    /**
+     * Set the call to the calling state, when the SIP INVITE has been sent and before the other
+     * party has sent a final response.
+     */
     public synchronized void setCalling() {
         calling = true;
     }
+
+    /**
+     * Set the call to the ringing state after the incoming INVITE is received but before the user
+     * has accepted or declined it.
+     */
     public synchronized void setRinging() {
         ringing = true;
     }
 
     /**
-     * Connect an incoming call that was previously ringing
+     * Connect an incoming call that is currently ringing. Call this method when the SIP interactions
+     * indicate that the other party has accepted the call and is ready to receive text. Pass in the
+     * RTP parameters agreed to in the SDP interactions.
+     * Precondition: this call is currently in the ringing state
+     * Postcondition: this call is now in the connected state, and the RTP stream is set up
      * @param remoteIP the IP of the remote party for the RTP stream
      * @param remotePort the port of the remote party for the RTP stream
      * @param localRTPPort the local port to be used for the RTP stream
@@ -201,7 +279,8 @@ public class RTTCall {
     }
 
     /**
-     *
+     * Connect an outgoing call has been accepted by the remote party, to set up the RTP
+     * session according to the agreed parameters.
      * @param remoteIP the IP of the remote party for the RTP stream
      * @param remotePort the port of the remote party for the RTP stream
      * @param localRTPPort the local port to be used for the RTP stream
@@ -256,6 +335,14 @@ public class RTTCall {
 
     }
 
+    /**
+     * The most important method: send real-time text in the connected call. Queued outgoing text
+     * is sent after the buffering interval, so calling this method more often than that interval
+     * will add text to the buffer. The buffering interval is short enough that a human does not
+     * notice.
+     * @param text the characters to send
+     * @throws IllegalStateException if the call is not connected yet
+     */
     public void sendText(String text) {
         if (!connected)
             throw new IllegalStateException("call is not connected, no one to send text to");
@@ -266,7 +353,8 @@ public class RTTCall {
 
     /**
      * End a call at any stage. Invoking multiple times has no effect; the
-     * first invocation ends the session.
+     * first invocation ends the session. This method must be called or else the RTP session will
+     * remain open.
      */
     public synchronized void end() {
         if (destructionLock.tryAcquire()) {
@@ -310,6 +398,8 @@ public class RTTCall {
      * hands them over to a modified version of Omnitor's RtpTextReceiver,
      * which removes duplicates and extracts the text and puts it in the
      * FIFO buffer for PrintThread to read.
+     *
+     *
      */
     private class ReceiveThread extends Thread implements RtpListener {
         private boolean stop = false;
