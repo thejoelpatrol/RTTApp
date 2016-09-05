@@ -16,9 +16,12 @@ import android.widget.TextView;
 
 import com.laserscorpion.rttapp.BuildConfig;
 import com.laserscorpion.rttapp.R;
+import com.laserscorpion.rttapp.db.ConversationHelper;
 import com.laserscorpion.rttapp.sip.SessionListener;
 import com.laserscorpion.rttapp.sip.SipClient;
 import com.laserscorpion.rttapp.sip.TextListener;
+
+import java.util.Date;
 
 
 public class RTTCallActivity extends AppCompatActivity implements TextListener,
@@ -38,7 +41,9 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener,
     private static final String STATE_3 = "controlText";
     private SipClient texter;
     private String otherParty;
-    TextEntryMonitor textHandler; // this watches text input and sends the RTT chars
+    private String myTextHistory = ""; // mainly used in the case of en bloc mode, since text is removed after typing
+    private TextEntryMonitor textHandler; // this watches text input and sends the RTT chars
+    private Date callStartTime;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -85,6 +90,8 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener,
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         window.addFlags(WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
         window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED);
+
+        callStartTime = new Date();
     }
 
     @Override
@@ -289,10 +296,23 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener,
      */
     public void sendText(View view) {
         textHandler.checkAndSend();
+        setTextHistory();
+    }
+
+    private void setTextHistory() {
+        EditText textField = (EditText)findViewById(R.id.compose_message);
+        String currentText = textField.getText().toString();
+        myTextHistory = myTextHistory + '\n' + currentText;
     }
 
     public void saveText(View view) {
-
+        if (myTextHistory.equals(""))
+            setTextHistory();
+        TextView incoming = (TextView)findViewById(R.id.textview);
+        String incomingText = incoming.getText().toString();
+        ConversationHelper db = new ConversationHelper(this);
+        // this should be made asynchronous
+        db.save(otherParty, myTextHistory, incomingText, callStartTime, new Date());
     }
 
     private void showFailDialog(String message) {
