@@ -42,6 +42,12 @@ public class IncomingCallActivity extends AppCompatActivity implements SessionLi
         window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED);
     }
 
+    @Override
+    protected void onStop() {
+        close();
+        super.onStop();
+    }
+
     public void acceptCall(View view) {
         Intent intent = new Intent(this, RTTCallActivity.class);
         intent.putExtra("com.laserscorpion.rttapp.contact_uri", from);

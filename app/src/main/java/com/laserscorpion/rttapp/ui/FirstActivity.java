@@ -75,17 +75,17 @@ public class FirstActivity extends AppCompatActivity {
 
     private String getRegistrar() {
         SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(this);
-        return pref.getString(REGISTRAR_PREF_NAME, "fail");
+        return pref.getString(REGISTRAR_PREF_NAME, "");
     }
 
     private String getUsername() {
         SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(this);
-        return pref.getString(SIP_USER_PREF_NAME, "fail");
+        return pref.getString(SIP_USER_PREF_NAME, "");
     }
 
     private String getPassword() {
         SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(this);
-        return pref.getString(SIP_PASSWORD_PREF_NAME, "fail");
+        return pref.getString(SIP_PASSWORD_PREF_NAME, "");
     }
 
     public void register(View view) {
