@@ -7,12 +7,6 @@ public class TextAppContract {
 
     private TextAppContract() {}
 
-    public static class Credentials implements BaseColumns {
-        public static final String TABLE_NAME = "credentials";
-        public static final String COLUMN_NAME_USERNAME = "username";
-        public static final String COLUMN_NAME_PASSWORD = "password";
-    }
-
     public static class Conversations implements BaseColumns {
         public static final String TABLE_NAME = "conversations";
         public static final String COLUMN_NAME_OTHER_PARTY_URI = "other_party_uri";
