@@ -296,8 +296,8 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener,
      * @param view
      */
     public void sendText(View view) {
-        textHandler.checkAndSend();
         addToTextHistory();
+        textHandler.checkAndSend();
     }
 
     private void addToTextHistory() {
