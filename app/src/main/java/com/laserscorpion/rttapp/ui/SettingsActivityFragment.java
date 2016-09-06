@@ -10,7 +10,7 @@ import android.view.ViewGroup;
 import com.laserscorpion.rttapp.R;
 
 /**
- * A placeholder fragment containing a simple view.
+ * The screen containing the preferences, which are automatically added by some magic
  */
 public class SettingsActivityFragment extends PreferenceFragment {
 

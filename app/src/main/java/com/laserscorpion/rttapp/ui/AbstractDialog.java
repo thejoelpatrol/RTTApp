@@ -6,6 +6,9 @@ import android.app.Dialog;
 import android.app.DialogFragment;
 import android.os.Bundle;
 
+/**
+ * A base class for all types of popup dialogs, with come common functionality.
+ */
 public abstract class AbstractDialog extends DialogFragment {
     protected static final String KEY = "error dialog arg";
     protected String message;

@@ -15,6 +15,16 @@ import android.widget.TextView;
 
 import com.laserscorpion.rttapp.R;
 
+/**
+ * This is
+ * in fact the first activity that starts when the app is launched but it is often not visible then.
+ * THis is the screen where the user chooses a server to Register with, and initiates registration.
+ * If credentials are available, i.e. the user has saved their preferences already, this activity
+ * automatically launches the next one, RTTRegistrationActivity. If not, it automatically launches
+ * SettingsActivity, where the user can enter credentials to save. This activity is displayed after
+ * navigating up from either of those. THis activity has no methods that need to be called by any
+ * other user classes, just automatic ones.
+ */
 public class FirstActivity extends AppCompatActivity {
     public static final String EXTRA_MESSAGE = "com.laserscorpion.rttapp.MESSAGE";
     public static final String TAG = "RTTApp";
