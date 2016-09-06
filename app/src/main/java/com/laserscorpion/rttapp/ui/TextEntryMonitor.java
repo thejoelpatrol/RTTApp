@@ -173,7 +173,7 @@ public class TextEntryMonitor implements TextWatcher {
         } catch (IllegalStateException e) {
             //addText("Can't send text yet - call not connected\n");
             makingManualEdit = true;
-            fieldToMonitor.setText(null);
+            fieldToMonitor.setText(currentText); // "current" is updated in onBeforeTextChanged(), so it's actually "old" by the time this is called
         }
     }
 
