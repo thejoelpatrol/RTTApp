@@ -12,11 +12,11 @@ public class ConversationHelper extends SQLiteOpenHelper {
     private static final String SQL_CREATE_TABLE =
             "CREATE TABLE " + TextAppContract.Conversations.TABLE_NAME + " (" +
                     TextAppContract.Conversations._ID + " INTEGER PRIMARY KEY," +
-                    TextAppContract.Conversations.COLUMN_NAME_OTHER_PARTY_URI + "TEXT," +
-                    TextAppContract.Conversations.COLUMN_NAME_MY_TEXT + "TEXT," +
-                    TextAppContract.Conversations.COLUMN_NAME_OTHER_PARTY_TEXT + "TEXT," +
-                    TextAppContract.Conversations.COLUMN_NAME_CALL_START_TIME + "TEXT," +
-                    TextAppContract.Conversations.COLUMN_NAME_CALL_END_TIME + "TEXT )";
+                    TextAppContract.Conversations.COLUMN_NAME_OTHER_PARTY_URI + " TEXT," +
+                    TextAppContract.Conversations.COLUMN_NAME_MY_TEXT + " TEXT," +
+                    TextAppContract.Conversations.COLUMN_NAME_OTHER_PARTY_TEXT + " TEXT," +
+                    TextAppContract.Conversations.COLUMN_NAME_CALL_START_TIME + " TEXT," +
+                    TextAppContract.Conversations.COLUMN_NAME_CALL_END_TIME + " TEXT )";
 
 
     public ConversationHelper(Context context) {
