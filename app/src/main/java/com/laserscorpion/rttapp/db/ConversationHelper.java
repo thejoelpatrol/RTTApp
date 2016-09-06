@@ -4,10 +4,12 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
+import android.util.Log;
 
 import java.util.Date;
 
 public class ConversationHelper extends SQLiteOpenHelper {
+    public static final String TAG = "ConversationHelper";
     public static final int DATABASE_VERSION = 1;
     private static final String SQL_CREATE_TABLE =
             "CREATE TABLE " + TextAppContract.Conversations.TABLE_NAME + " (" +
