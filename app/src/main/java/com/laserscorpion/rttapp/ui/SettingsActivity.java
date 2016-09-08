@@ -12,6 +12,14 @@ import android.view.View;
 
 import com.laserscorpion.rttapp.R;
 
+/**
+ * Nothing to see here, move along.
+ * This is sort of a wrapper around the SettingsActivityFragment. Why it is necessary to have both,
+ * I'm not exactly sure. I'm just doing what the documentation said to do. It says to use Fragments
+ * (e.g. PreferenceFragment) now instead of entire Activities, but there is a PreferenceActivity we
+ * could probably use instead. I think at the time I created this, I could only find an example of
+ * the PreferenceFragment in the official guides, but now I'm not sure we have to do it that way.
+ */
 public class SettingsActivity extends AppCompatActivity {
 
     @Override

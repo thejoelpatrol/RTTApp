@@ -23,7 +23,12 @@ import com.laserscorpion.rttapp.sip.TextListener;
 
 import java.text.ParseException;
 
-
+/**
+ * This activity initiates SIP registration on launch, and basically serves as the "home" screen
+ * when the user is not on a call. Outgoing calls are started from this screen. It could probably
+ * use some re-designing to remove the SIP log and replace it with something more useful, such as a
+ * list of recent calls or some interface for viewing saved conversations.
+ */
 public class RTTRegistrationActivity extends AppCompatActivity implements TextListener,
         CallReceiver,
                                                                             AbstractDialog.DialogListener,
