@@ -1,4 +1,4 @@
-package com.laserscorpion.rttapp;
+package com.laserscorpion.rttapp.rtp;
 
 import android.javax.sip.ClientTransaction;
 import android.javax.sip.Dialog;
