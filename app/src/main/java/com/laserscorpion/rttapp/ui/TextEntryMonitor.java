@@ -49,13 +49,15 @@ public class TextEntryMonitor implements TextWatcher {
      * @param screenRotated whether this new TextEntryMonitor is being created due to screen rotation, i.e. the activity is destroyed and recreated
      */
     public TextEntryMonitor(EditText watchThis, boolean realTime, SipClient sipClient, CharSequence startText, boolean screenRotated) {
-        fieldToMonitor = watchThis;
-        useRealTimeText = realTime;
-        if (useRealTimeText)
-            fieldToMonitor.addTextChangedListener(this);
-        currentText = startText;
-        texter = sipClient;
-        this.screenRotated = screenRotated;
+        synchronized (watchThis) {
+            fieldToMonitor = watchThis;
+            useRealTimeText = realTime;
+            if (useRealTimeText)
+                fieldToMonitor.addTextChangedListener(this);
+            currentText = startText;
+            texter = sipClient;
+            this.screenRotated = screenRotated;
+        }
     }
 
     /**
@@ -82,7 +84,7 @@ public class TextEntryMonitor implements TextWatcher {
             return; // ignore text addition due to destruction and recreation of activity
         }
         if (BuildConfig.DEBUG)
-            Log.d(TAG, "text changed! start: " + start + " | before: " + before + " | count: " + count);
+            //Log.d(TAG, "text changed! start: " + start + " | before: " + before + " | count: " + count);
 
         if (editOverlappedEnd(start, before, count)) {
             if (charsOnlyAppended(s, start, before, count)) {
@@ -120,10 +122,12 @@ public class TextEntryMonitor implements TextWatcher {
     @Override
     public synchronized void afterTextChanged(Editable s) {
         if (needManualEdit) {
-            makingManualEdit = true;
-            needManualEdit = false;
-            s.replace(0, s.length(), currentText);
-            if (BuildConfig.DEBUG) Log.d(TAG, "initiating replacement to undo prohibited edit");
+            synchronized (fieldToMonitor) {
+                makingManualEdit = true;
+                needManualEdit = false;
+                s.replace(0, s.length(), currentText);
+                if (BuildConfig.DEBUG) Log.d(TAG, "initiating replacement to undo prohibited edit");
+            }
         }
         if (makingManualEdit) {
             makingManualEdit = false;
@@ -166,14 +170,15 @@ public class TextEntryMonitor implements TextWatcher {
      * Precondition: charsOnlyAppended()
      */
     private void sendAppendedChars(CharSequence now, int start, int before, int count) {
-        if (BuildConfig.DEBUG) Log.d(TAG, "chars appended");
+        //if (BuildConfig.DEBUG) Log.d(TAG, "chars appended");
         CharSequence added = now.subSequence(start + before, now.length());
         try {
             texter.sendRTTChars(added.toString());
         } catch (IllegalStateException e) {
-            //addText("Can't send text yet - call not connected\n");
-            makingManualEdit = true;
-            fieldToMonitor.setText(null);
+            synchronized (fieldToMonitor) {
+                makingManualEdit = true;
+                fieldToMonitor.setText(currentText); // "current" is updated in onBeforeTextChanged(), so it's actually "old" by the time this is called
+            }
         }
     }
 
@@ -263,11 +268,13 @@ public class TextEntryMonitor implements TextWatcher {
      * i.e. en bloc mode. The text in the field is sent to the other party and removed from the field.
      */
     public void checkAndSend() {
-        CharSequence text = fieldToMonitor.getText();
-        if (text.length() > 0) {
-            String toSend = text.toString() + '\n';
-            texter.sendRTTChars(toSend);
-            fieldToMonitor.setText(null);
+        synchronized (fieldToMonitor) {
+            CharSequence text = fieldToMonitor.getText();
+            if (text.length() > 0) {
+                String toSend = text.toString() + '\n';
+                texter.sendRTTChars(toSend);
+                fieldToMonitor.setText(null);
+            }
         }
     }
 

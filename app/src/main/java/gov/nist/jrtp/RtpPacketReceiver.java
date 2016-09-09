@@ -121,7 +121,7 @@ public class RtpPacketReceiver extends Thread {
 				if (lastReceiveTime > 0) {
 					
 					long elapsedTime = receiveTime - lastReceiveTime;
-					System.out.println("elapsed: " + elapsedTime);
+					//System.out.println("elapsed: " + elapsedTime);
 					
 				}
 				

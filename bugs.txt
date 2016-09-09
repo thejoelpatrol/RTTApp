@@ -19,7 +19,7 @@ UI deficiencies
 -make sure app continues running in bg - consider adding a service?
 -use display name, not just sip uri
 -landscape mode in call doesn't look good
--text saving doesn't do anything
+-saved conversations are not accessible anywhere, they're just saved in the DB
 
 
 Other limitations

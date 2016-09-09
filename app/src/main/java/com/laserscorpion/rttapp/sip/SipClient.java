@@ -37,7 +37,7 @@ import android.gov.nist.javax.sip.SipStackExt;
 import android.gov.nist.javax.sip.clientauthutils.*;
 
 import com.laserscorpion.rttapp.BuildConfig;
-import com.laserscorpion.rttapp.RTTCall;
+import com.laserscorpion.rttapp.rtp.RTTCall;
 
 import gov.nist.jrtp.RtpException;
 
