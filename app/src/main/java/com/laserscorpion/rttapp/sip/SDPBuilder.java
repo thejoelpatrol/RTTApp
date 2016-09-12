@@ -28,7 +28,7 @@ import java.security.SecureRandom;
 import java.util.Vector;
 
 /**
- * A collection of two static helper methods to read and create SDP data, for the purpose of
+ * A collection of static helper methods to read and create SDP data, for the purpose of
  * setting up RTT T140 calls
  */
 public class SDPBuilder {
@@ -95,6 +95,7 @@ public class SDPBuilder {
 
 
     /**
+     * Create the SDP specifying how we want to receive text RTP media
      * @param t140MapNum the preferred map number for the red media type, or 0 for no preference
      * @param redMapNum  the preferred map number for the red media type, or 0 for no preference, or -1 for no redundancy
      * @return
@@ -156,7 +157,7 @@ public class SDPBuilder {
 
 
     /**
-     * we're not actually going to send or receive audio. we are setting up a dummy audio stream
+     * We're not actually going to send or receive audio — we set up a dummy audio stream
      * so as to work with Asterisk, which assumes there must always be at least one audio stream
      * on any type of call.
      *
@@ -183,7 +184,13 @@ public class SDPBuilder {
     /* I'll be mad if it turns out there is a way to do this automatically with the
         SDP library, but as far as I can tell, all it does is structure the string into
         discrete lines of different types
-        returns: the t140 payload map number from the incoming SDP, or -1 if none
+    */
+    /**
+     * Get the mediatype from the other party's SDP, to know which stream is the primary T.140 and
+     * which is the redundant stream
+     * @param incomingRequestResponse the incoming message containing the other party's SDP
+     * @param mediaType either T140 or T140red, for the redundant stream
+     * @return the t140 payload map number from the incoming SDP, or -1 if none
      */
     public static int getT140MapNum(Message incomingRequestResponse, mediaType mediaType) {
         String body = new String(incomingRequestResponse.getRawContent(), StandardCharsets.UTF_8);
@@ -216,6 +223,11 @@ public class SDPBuilder {
         }
     }
 
+    /**
+     * Get the remote port number where the other party expects to receive text RTP
+     * @param otherPartySDP the message containing the other party's preferred session description
+     * @return the port number
+     */
     public static int getT140PortNum(Message otherPartySDP) {
         String body = new String(otherPartySDP.getRawContent(), StandardCharsets.UTF_8);
         try {
@@ -236,6 +248,11 @@ public class SDPBuilder {
         }
     }
 
+    /**
+     * Get the remote IP address where the other party expects to receive text RTP
+     * @param otherPartySDP the message containing the other party's preferred session description
+     * @return the IP address
+     */
     public static String getRemoteIP(Message otherPartySDP) {
         String body = new String(otherPartySDP.getRawContent(), StandardCharsets.UTF_8);
         try {

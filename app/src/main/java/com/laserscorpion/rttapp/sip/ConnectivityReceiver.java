@@ -17,6 +17,11 @@ public class ConnectivityReceiver extends BroadcastReceiver {
     private static final String TAG = "ConnectivityReceiver";
     private IPChangeListener listener;
 
+    /**
+     * Create a new ConnectivityReceiver and register your IPChangeListener with it here to alert
+     * that listener whenever the IP address may have changed.
+     * @param listener the listener interested in knowing when the IP address changes
+     */
     public ConnectivityReceiver(IPChangeListener listener) {
         this.listener = listener;
     }
