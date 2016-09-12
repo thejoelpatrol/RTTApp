@@ -1,11 +1,14 @@
-# Purpose
+# RTTApp
+An initial version of an Android real-time text (RFC 4103) app
+
+## Purpose
 <p>
 	RFC 4103 is an internet standard for a replacement to legacy analog TTY communications for deaf and hard-of-hearing people. This is one of the first open-source Android implementations of the standard. It is written in pure Java and uses standard Android APIs wherever possible. It is usable for some needs, though a widespread release would depend on several improvements.
 </p>
 <p>
 	More information is available in <a href="http://www.laserscorpion.com/RTTApp/">this report</a>. Anyone wishing to extend this project should review that document, as well as the <a href="https://thejoelpatrol.github.io/RTTApp/">code's javadoc</a>.
 </p>
-# Basic introduction
+## Basic introduction
 <p>
 	The app contains about 3000 Java SLOC across 25 classes not counting libraries, and various XML UI layout files. It is targeted at Android 4.4 (KitKat) - 6.0 (Marshmallow). It includes all the files necessary to build it with Android Studio 2.1.3 (IntelliJ) and a Java 8 JDK. In order to use some Java 8 features, the build files specify use of the experimental (but likely standard in the future) <a href="https://source.android.com/source/jack.html">Jack toolchain</a>. 
 </p>
