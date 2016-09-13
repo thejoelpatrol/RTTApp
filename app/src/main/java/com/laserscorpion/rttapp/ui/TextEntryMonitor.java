@@ -15,13 +15,13 @@ import java.util.Arrays;
 /**
  * The TextEntryMonitor, one of which is created by the RTTCallActivity at a time,
  * listens for input on the user's text field (EditText), and keeps track of which
- * characters have changed.
+ * characters have changed. It sends those characters in the real-time call via the SipClient.
  *
  * There are two modes, real time and en bloc, specified in the constructor.
  *
  * Real-time mode:
  * If text is added or deleted at the end, TextEntryMonitor tells the SipClient to send
- * the new characters (possibly '\d') in the real-time call. If edits are made earlier in the text,
+ * the new characters (possibly '\b') in the real-time call. If edits are made earlier in the text,
  * it undoes them, since the user is not allowed to add or remove text anywhere besides the
  * end of the field. Keeping track of these edits is pretty annoying, and you need to understand how
  * the Android.text.TextWatcher interface works before touching any of this.
@@ -41,7 +41,7 @@ public class TextEntryMonitor implements TextWatcher {
     private boolean useRealTimeText; // real-time char-by-char mode vs. en bloc mode
 
     /**
-     *
+     * The only constructor.
      * @param watchThis the text field to monitor for changes
      * @param realTime whether the text should be sent in real time, character by character, or only when checkAndSend() is called
      * @param sipClient the global hub for all things SIP, and who is responsible for sending the real-time text chars
@@ -66,12 +66,12 @@ public class TextEntryMonitor implements TextWatcher {
      * called. En bloc methods are at the end of the class. This method enforces the rule that the
      * user may only enter and delete text at the end of the field, not earlier (as in SipCon1).
      *
-     * The important thing to know here is that in beforeTextChanged, we set currentText to the
-     * text in the field before the change occurs. Then, in onTextChanged, s is the *new* text and
+     * The important thing to know here is that in beforeTextChanged(), we set currentText to the
+     * text in the field before the change occurs. Then, in onTextChanged(), s is the *new* text and
      * currentText is the *old* text. If we edit the text programmatically (e.g. to undo a prohibited
      * edit), these callbacks fire, so they need to know if they are being invoked due to a change
      * made by this code, not by the user. Thus we have the flag makingManualEdit, which is set in
-     * afterTextChanged, if it sees the flag needManualEdit.
+     * afterTextChanged(), if it sees the flag needManualEdit.
      */
     @Override
     public synchronized void onTextChanged(CharSequence s, int start, int before, int count) {

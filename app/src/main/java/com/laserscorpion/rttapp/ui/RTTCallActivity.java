@@ -23,13 +23,55 @@ import com.laserscorpion.rttapp.sip.TextListener;
 
 import java.util.Date;
 
-
+/**
+ * The screen for a call in progress.
+ *
+ * There are two call modes, selectable from Settings: real-time and en-bloc modes. In real-time
+ * mode, chars are sent as they are entered. There is no notion of messages and no need for a "Send"
+ * button. In en-bloc mode, chars are only sent in bunches when Send is pressed. The Send button is
+ * only visible in en-bloc mode, and touching it calls sendText(), which is not used otherwise. In
+ * both modes, outgoing text sending is handled by a helper, TextEntryMonitor. That class watches
+ * the EditText in this activity for changes, and determines which characters to send via the
+ * SipClient.
+ *
+ * This screen contains three TextViews, one of which is an EditText where the user enters their
+ * own text. The largest TextView contains the incoming text, which is added in
+ * addText(), called from RTTextReceived(). Adding text to the display fields is kind of a hassle
+ * due to the need to run it on the UI thread. Android is rude enough to make us worry about this.
+ *
+ * A third, smaller TextView (R.id.control_messages) shows the call progress (Dialing, ringing,
+ * connected, etc). There is probably a slicker way to display that information, like some icon that
+ * changes state, or even a label whose entire text changes, rather than adding new lines to this
+ * TextView.
+ *
+ * Incoming text must be scrubbed of 0xFFEF Unicode chars to maintain an accurate view of how many
+ * characters are in the incoming text field. When editing CharSequences, for example when getting a
+ * subsequence that chops off the end, invisible 0xFFEF characters may remain, which count as
+ * characters but to a human are not really characters. We need to remove these if they ever occur,
+ * since their presence in the received text will be due to changes made here, and they will not
+ * likely be sent in the actual incoming text. If they are, I suppose there could be a bug here, but
+ * it probably won't have any effect. We don't want them in the other party's displayed text field
+ * because when a backspace char comes in, we need to delete one char, and it should be a real
+ * visible one, not a fake invisible one.
+ *
+ * Text of the call may be saved at any time via the "Save Text" button, or at the end of the call
+ * from an option in the dialog that pops up.
+ *
+ * The activity is discarded when a dialog callback indicates to the activity that the end-call
+ * dialog has been dismissed. Various kinds of dialogs may be displayed depending on what caused
+ * them (error, hanging up, etc), but all of them call a method of the activity to let it know that
+ * the dialog is done and the activity may be destroyed.
+ */
 public class RTTCallActivity extends AppCompatActivity implements TextListener,
                                                                     SessionListener,
-        FailDialog.FailDialogListener,
+                                                                    FailDialog.FailDialogListener,
                                                                     AbstractDialog.DialogListener,
                                                                     CallEndDialog.SaveDialogListener {
 
+    /**
+     * A struct that is used to store a String that contains no '\b' (0x) chars, and a count of how
+     * many extra '\b' were encountered
+     */
     private class CleanString {
         public int backspaces = 0;
         public String str = new String();
@@ -171,9 +213,9 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener,
 
 
     /**
-     * Android framework programmers think that \uFEFF is an acceptable thing to leave in a string,
+     * Whoever programmed CharSequence thinks that \uFEFF is an acceptable thing to leave in a string,
      * especially at the end. Unicode has deprecated the usage of this character as a non-breaking
-     * space. These Google devs don't care and use this invisible character to save having to edit
+     * space. These Google (Apache?) devs don't care and use this invisible character to save having to edit
      * the string sometimes, when a char is deleted at the end. What, do they think that no one will
      * ever notice that charSequence.length() != actualRealUsefulCharacters.length()? Why don't they
      * just use a null char? I say this is a pure bug in CharSequence. Use null!
@@ -198,7 +240,11 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener,
 
     /**
      * Process incoming text and remove backspaces and the characters they are meant to delete, plus
-     * count how many additional backspaces need to be used to modify other text
+     * count how many additional backspaces need to be used to modify other text.
+     *
+     * That is, if the input contains more real chars than backspaces, the output contains text and
+     * a backspace count of 0. If the input contains more backspaces than chars, the output contains
+     * no text and a count of additional backspaces to delete from other text.
      *
      * @param text the dirty string that may contain backspaces, which we need to remove
      * @return a CleanString, which is a small struct containing the actual clean string to print to the screen,
@@ -234,16 +280,27 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener,
         return clean;
     }
 
+    /**
+     * TextListener interface callback
+     */
     @Override
     public void controlMessageReceived(String message) {
         addControlText(message);
     }
 
+    /**
+     * TextListener interface callback
+     * @param text the incoming characters
+     */
     @Override
     public void RTTextReceived(String text) {
         addText(text);
     }
 
+    /**
+     * SessionListener interface callback
+     * @param userName the SIP URI of the other party
+     */
     @Override
     public void SessionEstablished(String userName) {
         addControlText("Connected!");
@@ -263,22 +320,35 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener,
     }
 
 
+    /**
+     * Called by pressing the red Hang Up button
+     * @param view the button
+     */
     public void hangUp(View view) {
         texter.hangUp();
         showEndCallDialog("You hung up. Do you want to save the text of this call?");
         //finish();
     }
 
-    @Override
+    /**
+     * SessionListener interface callback
+     */
+     @Override
     public void SessionClosed() {
         showEndCallDialog(otherParty + " hung up. Do you want to save the text of this call?");
     }
 
+    /**
+     * SessionListener interface callback
+     */
     @Override
     public void SessionFailed(String reason) {
         showFailDialog("Failed to establish call: " + reason);
     }
 
+    /**
+     * SessionListener interface callback
+     */
     @Override
     public void SessionDisconnected(String reason) {
         showEndCallDialog("Call disconnected: " + reason + ". \n\nDo you want to saved the text of this call?");
@@ -293,7 +363,10 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener,
      * call here. Basically, the purpose of this method is to pass the button signal along to the
      * TextEntryWatcher. It can only be called if the Send button is visible, which occurs when the
      * preference is set.
-     * @param view
+     *
+     * addToTextHistory() is used to keep a record of the messages the user sends, since the text is
+     * removed from the EditText. It can then be saved to the DB later, if necessary.
+     * @param view Send button
      */
     public void sendText(View view) {
         addToTextHistory();
@@ -313,6 +386,12 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener,
         myTextHistory = currentText;
     }
 
+    /**
+     * Called by the Save Text button, or at the end of a call. Both parties' text and the call time
+     * is saved in a SQLiteDatabase, though unfortunately there is no UI yet for retrieving call
+     * text.
+     * @param view the Save Text button (or null, it's not used)
+     */
     public void saveText(View view) {
         if (useRealTime)
             setTextHistory();
@@ -320,7 +399,6 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener,
         String incomingText = incoming.getText().toString();
         ConversationHelper db = new ConversationHelper(this);
         // this should be made asynchronous
-        Log.d(TAG, "saving my text: " + myTextHistory);
         db.save(otherParty, myTextHistory, incomingText, callStartTime, new Date());
     }
 
@@ -335,17 +413,29 @@ public class RTTCallActivity extends AppCompatActivity implements TextListener,
     }
 
 
+    /**
+     * FailDialogListener callback. This is called when the call fails and the resulting dialog is
+     * done saying so.
+     */
     @Override
     public synchronized void dialogFail() {
         finish();
     }
 
+    /**
+     * DialogListener callback.
+     * This one happens to be called from the end-of-call save-text dialog when choosing "No" to
+     * saving text.
+     */
     @Override
     public void dialogDismissed() {
-        // called from the end-of-call save-text dialog when choosing "No" to saving text
         finish();
     }
 
+    /**
+     * SaveDialogListener callback, which is called when the end-of-call dialog Save Text option is
+     * chosen.
+     */
     @Override
     public synchronized void dialogSaveText() {
         saveText(null);

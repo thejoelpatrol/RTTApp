@@ -8,7 +8,7 @@
     <string name="title_activity_first">RTTApp</string>
     <string name="title_activity_display_message">RTTApp</string>
     <string name="title_activity_settings">Settings</string>
-    <string name="pref_registrar">Registrar/server IP</string>
+    <string name="pref_registrar">Registrar/server address</string>
     <string name="pref_username">Username</string>
     <string name="pref_password">Password</string>
     <string name="pref_use_realtime">Send text in real time?</string>

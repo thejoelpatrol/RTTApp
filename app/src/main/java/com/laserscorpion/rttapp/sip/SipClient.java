@@ -541,7 +541,7 @@ public class SipClient implements SipListener, ConnectivityReceiver.IPChangeList
             request.addHeader(localContactHeader);
             if (extraHeader != null)
                 request.addHeader(extraHeader);
-            Log.d(TAG, "Sending stateful registration for " + globalSipAddress);
+            Log.d(TAG, "Sending stateful registration " /*+ globalSipAddress*/);
             SipRequester requester = new SipRequester(sipProvider);
             requester.execute(request);
             String result = requester.get();

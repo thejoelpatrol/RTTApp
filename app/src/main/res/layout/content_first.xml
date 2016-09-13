@@ -16,8 +16,9 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="You may change your username under settings.
-        \nHere you specify the registrar/server, since it may not have a static IP."/>
+        android:text="You are logged out. Log in here.
+        \nYou may change your username under settings.
+        \nHere you specify the registrar/server, in case it does not have a static IP."/>
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
