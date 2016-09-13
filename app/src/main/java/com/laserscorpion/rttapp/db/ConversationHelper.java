@@ -8,6 +8,9 @@ import android.util.Log;
 
 import java.util.Date;
 
+/**
+ * Saves (and retrives, in the future) conversation records from the database
+ */
 public class ConversationHelper extends SQLiteOpenHelper {
     public static final String TAG = "ConversationHelper";
     public static final int DATABASE_VERSION = 1;
@@ -40,6 +43,14 @@ public class ConversationHelper extends SQLiteOpenHelper {
 
     }
 
+    /**
+     * Save a conversation in the database
+     * @param URI the name of the other party in the call
+     * @param myText the text sent by the user
+     * @param otherPartyText the text received from the other party
+     * @param callStartTime the time the call began
+     * @param callEndTime e.g. now (new Date())
+     */
     public void save(String URI, String myText, String otherPartyText, Date callStartTime, Date callEndTime) {
         SQLiteDatabase sqLiteDatabase = getWritableDatabase();
         ContentValues values = new ContentValues();
