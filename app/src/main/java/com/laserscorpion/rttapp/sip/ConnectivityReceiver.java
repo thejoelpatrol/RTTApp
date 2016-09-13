@@ -9,11 +9,19 @@ import android.util.Log;
 
 import com.laserscorpion.rttapp.BuildConfig;
 
-
+/**
+ * Register an IPChangeListener with a new ConnectivityReceiver to be notified when the IP
+ * address may have changed.
+ */
 public class ConnectivityReceiver extends BroadcastReceiver {
     private static final String TAG = "ConnectivityReceiver";
     private IPChangeListener listener;
 
+    /**
+     * Create a new ConnectivityReceiver and register your IPChangeListener with it here to alert
+     * that listener whenever the IP address may have changed.
+     * @param listener the listener interested in knowing when the IP address changes
+     */
     public ConnectivityReceiver(IPChangeListener listener) {
         this.listener = listener;
     }
@@ -30,6 +38,10 @@ public class ConnectivityReceiver extends BroadcastReceiver {
         }
     }
 
+    /**
+     * An IPChangeListener that is registered with a ConnectivityReceiver is notified when the IP
+     * address may have changed.
+     */
     public interface IPChangeListener {
         void IPAddrChanged();
     }

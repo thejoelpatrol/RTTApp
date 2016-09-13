@@ -1,10 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
+  <component name="AndroidDexCompilerConfiguration">
+    <option name="CORE_LIBRARY" value="true" />
+  </component>
   <component name="EntryPointsManager">
     <entry_points version="2.0" />
   </component>
   <component name="JavadocGenerationManager">
-    <option name="OUTPUT_DIRECTORY" value="$PROJECT_DIR$/app/javadoc" />
+    <option name="OUTPUT_DIRECTORY" value="$USER_HOME$/Documents/Columbia/e6901/RTTApp/gh-pages" />
     <option name="OPTION_SCOPE" value="protected" />
     <option name="OPTION_HIERARCHY" value="true" />
     <option name="OPTION_NAVIGATOR" value="true" />
@@ -15,11 +18,18 @@
     <option name="OPTION_DOCUMENT_TAG_VERSION" value="false" />
     <option name="OPTION_DOCUMENT_TAG_DEPRECATED" value="true" />
     <option name="OPTION_DEPRECATED_LIST" value="true" />
-    <option name="OTHER_OPTIONS" value="-bootclasspath /Users/joel/Library/Android/sdk/platforms/android-23/android.jar -encoding UTF-8 -docencoding utf-8 -charset utf-8" />
+    <option name="OTHER_OPTIONS" value="-bootclasspath /Users/joel/Library/Android/sdk/platforms/android-23/android.jar -encoding UTF-8 -docencoding utf-8 -charset utf-8 -overview /Users/joel/Documents/Columbia/e6901/RTTApp/RTTApp/app/src/main/java/com/laserscorpion/rttapp/overview.html" />
     <option name="HEAP_SIZE" />
     <option name="LOCALE" />
     <option name="OPEN_IN_BROWSER" value="true" />
     <option name="OPTION_INCLUDE_LIBS" value="false" />
+  </component>
+  <component name="MavenImportPreferences">
+    <option name="generalSettings">
+      <MavenGeneralSettings>
+        <option name="mavenHome" value="Bundled (Maven 3)" />
+      </MavenGeneralSettings>
+    </option>
   </component>
   <component name="NullableNotNullManager">
     <option name="myDefaultNullable" value="android.support.annotation.Nullable" />
@@ -44,6 +54,22 @@
         </list>
       </value>
     </option>
+  </component>
+  <component name="ProjectInspectionProfilesVisibleTreeState">
+    <entry key="Project Default">
+      <profile-state>
+        <expanded-state>
+          <State>
+            <id />
+          </State>
+        </expanded-state>
+        <selected-state>
+          <State>
+            <id>Android</id>
+          </State>
+        </selected-state>
+      </profile-state>
+    </entry>
   </component>
   <component name="ProjectLevelVcsManager" settingsEditedManually="false">
     <OptionsSetting value="true" id="Add" />

@@ -3,7 +3,9 @@ package com.laserscorpion.rttapp.sip;
 import java.util.EventListener;
 
 /**
- * Created by joel on 2/4/16.
+ * SessionListeners are notified when call state changes.
+ * This allows some non-SIP-layer class to listen for changes in the session state (e.g.
+ * an upper layer that helps the user interact with the call).
  */
 public interface SessionListener extends EventListener {
 

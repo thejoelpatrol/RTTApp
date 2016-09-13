@@ -1,0 +1,26 @@
+<html>
+<body> 
+<p>
+	<a href="https://github.com/thejoelpatrol/RTTApp">Source code on GitHub</a><br>
+	RTTApp is split into several layers: UI, SIP, and call, plus the database package which is not specific to one layer. Most functionality in setting up calls and managing app state is in the SIP layer, in particular in the SipClient. The real-time text functionality is provided by Omnitor's RFC 4103/t.140 library, at the lowest level, outside the com.laserscorpion.rttapp package, though this is managed via the RTTCall.
+</p>
+
+<pre>
+		--------------
+		|  UI layer  |
+		--------------
+		      |
+		--------------
+		| SIP layer  |  (SipClient)
+		--------------
+		      |
+		--------------
+		| Call layer |  (RTTCall)
+		--------------
+		      |
+		--------------
+		| RTP layer  |  (JRTP, Omnitor t140)
+		--------------
+</pre>
+</body>
+</html>

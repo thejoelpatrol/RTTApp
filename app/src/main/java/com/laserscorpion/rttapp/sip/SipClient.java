@@ -42,7 +42,100 @@ import com.laserscorpion.rttapp.rtp.RTTCall;
 import gov.nist.jrtp.RtpException;
 
 /**
- * Some of this class based on http://alex.bikfalvi.com/teaching/upf/2013/architecture_and_signaling/lab/sip/
+ * <p>This is the core of the SIP layer, and the entire app. All SIP messages are received here, and
+ * sent from here via SipRequester/SipResponder/SipTransactionRequester. It is a singleton, as it
+ * makes up much of the app, so the proper usage is <em>first</em> call init() and <em>then</em>
+ * call getInstance() whenever a handle to this class is needed. If necessary later, calling
+ * reset() re-initializes some of the parameters from init(). When disconnecting from the server or
+ * quitting, it is necessary to call close().</p>
+ * <pre>
+ *     --------------
+ *     |  UI layer  |
+ *     --------------
+ *            |
+ *     <strong>--------------
+ *     | SIP layer  |  (SipClient)
+ *     --------------</strong>
+ *            |
+ *     --------------
+ *     | Call layer |  (RTTCall)
+ *     --------------
+ *            |
+ *     --------------
+ *     | RTP layer  |  (JRTP, Omnitor t140)
+ *     --------------
+ * </pre>
+ * <p>Though RTTCall runs the actual RTP sessions, SipClient is responsible for negotiating the
+ * session, and it can only manage one call at a time. It knows when a call is currently connected,
+ * or ringing, because it arranges it via SIP messages, interaction from the UI layer above, and
+ * creating each RTTCall. If a call comes in while another one is in progress, SipClient responds
+ * 486 Busy Here. onACallNow() indicates whether a call is in progress. An RTTCall is created early
+ * in the call establishing sequence, and SipClient later updates RTTCall when the call is fully
+ * agreed upon and the RTP parameters are available.</p>
+ *
+ * <p>The incoming call (acceptance) sequence is a bit hairy and involves the other layers. This could
+ * probably use some refactoring or at least refinement to ensure reliability. This sequence grew
+ * out of experience with the concurrency problems surrounding duplicate or multiple requests coming
+ * in simultaneously, and the desire to only handle one call at a time. The steps are as follows:</p>
+ * <pre>
+ * 1. INVITE received
+ * 2. receiveCall():
+ *      a. <strong>tries</strong> to acquire callLock, and holds it to prevent any other calls being created
+ *      b. checks if onACallNow()
+ *      c. responds 180 Ringing
+ *      d. creates RTTCall
+ *      e. alerts callReceiver (CallReceiver listener in UI layer) that a call is ringing
+ * 3. UI layer accepts or declines call
+ *      a. calls SipClient.acceptCall()
+ *      b. or SipClient.declineCall()
+ * 4. acceptCall():
+ *      a. sends 200 OK response
+ *      b. releases callLock, and now relies on onACallNow() to detect business
+ * 5. ACK received
+ * 6. beginCall():
+ *      a. gives RTP params to RTTCall
+ *      b. waits for UI to get ready to receive text
+ *      c. updates RTTCall's list of TextReceivers and tells it to start
+ *      d. tells UI layer that call is established with notifySessionEstablished()</pre>
+ * <p>Some of this complication is unavoidable due to SIP's multi-step process, but the locking is
+ * especially weird, I know. It's sketchy to acquire a lock, wait for some other part of the app
+ * to do something, assume the lock is still held, and then later release it. The purpose of the
+ * lock is to prevent simultaneous INVITEs from triggering receiveCall(), so it seems like it could
+ * be released after creating the RTTCall, but my fuzzy memory suggests that some problem occurred.
+ * There's a reason I didn't release the lock until later, but now that I have forgotten it, I feel
+ * bad telling you not to change this. This might be ok to change, but beware. Getting it right with
+ * all the incoming traffic I was seeing was tough, so I'm wary of breaking it, but it's probably
+ * fragile as it is now anyway.</p>
+ *
+ * <p>All network communication in this class, and indeed this layer, is done by helper AsyncTask
+ * subclasses, e.g. SipRequester. This might not really be necessary. Android is strict about using
+ * the network on the main thread, which is usually good, but in this case sort of annoying. You don't
+ * really want to be doing TCP on the main thread, but the only network stuff that SipClient is
+ * doing is sending SIP messages over UDP, which basically happens immediately, no waiting involved.
+ * So we could disable this restriction with StrictMode.ThreadPolicy.LAX? This would allow us to
+ * get rid of the unwieldy AsyncTasks. The main concern is whether setting this global option would
+ * have other unintended consequences in other parts of the app.</p>
+ *
+ * <p>SipClient is listening for changes in internet connectivity, specifically changes in the IP
+ * address, which happens often enough to really care about it on a mobile device.
+ * When the IP changes, it must re-register with the server at the new address. If this
+ * happens during a call, the call will mysteriously hang, so SipClient will end a call if it
+ * detects this change.</p>
+ *
+ * <p>Other classes often need to receive messages from SipClient, when network/call state changes.
+ * Thus it has lists of listeners of various types, managed with methods such as
+ * addSessionListener()/removeSessionListener(). When an event occurs that interests those listeners,
+ * SipClient notifies all of them, if there is more than one, with a method such as e.g.
+ * notifySessionClosed().</p>
+ *
+ * <p>Currently SipClient does not do a great job correlating sequences of messages, e.g. a request
+ * we sent and the response to it that we get back. It should probably maintain a data structure of
+ * Requests and Responses it has sent, and the transactions/dialogs involved in them, to
+ * definitively know the purpose of some incoming message, whether a SIP message or something from
+ * the SipStack, like a TransactionTerminated message. This would also help weed out stray messages
+ * that we don't care about.</p>
+ *
+ * <p>Some of this class based on http://alex.bikfalvi.com/teaching/upf/2013/architecture_and_signaling/lab/sip/
  */
 public class SipClient implements SipListener, ConnectivityReceiver.IPChangeListener {
     private static final String TAG = "SipClient";
@@ -80,9 +173,9 @@ public class SipClient implements SipListener, ConnectivityReceiver.IPChangeList
     private Timer registrationTimer;
 
     /*  callLock has a fairly normal purpose: it must be held whenever making a change
-        to currentCall. However, it is sometimes held by an earlier action, a precondition
-        of the current action, so it is not necessarily acquired every time currentCall
-        is modified. This usage is strange, I know.
+        to the currentCall reference. However, it is sometimes held by an earlier action, a
+        precondition of the current action, so it is not necessarily acquired every time currentCall
+        is modified. This usage is strange, I know. See above.
      */
     private Semaphore callLock;
     private RTTCall currentCall;
@@ -332,6 +425,10 @@ public class SipClient implements SipListener, ConnectivityReceiver.IPChangeList
         }
     }
 
+    /**
+     * register a listener as interested in receiving session-related notifications
+     * @param newListener the new listener. If it already registered, nothing happens
+     */
     public void addSessionListener(SessionListener newListener) {
         synchronized (sessionReceivers) {
             if (sessionReceivers.contains(newListener))
@@ -340,6 +437,11 @@ public class SipClient implements SipListener, ConnectivityReceiver.IPChangeList
             sessionReceivers.notify();
         }
     }
+
+    /**
+     * remove a listener from receiving session notifications
+     * @param existingListener the listener to remove
+     */
     public void removeSessionListener(SessionListener existingListener) {
         synchronized (sessionReceivers) {
             if (sessionReceivers.contains(existingListener))
@@ -354,6 +456,11 @@ public class SipClient implements SipListener, ConnectivityReceiver.IPChangeList
         }
     }
 
+    /**
+     * Send some real-time text within the current call. A pretty important capability...
+     * @param add the characters to send in the RTT session
+     * @throws IllegalStateException if not connected on a call
+     */
     public void sendRTTChars(String add) throws IllegalStateException {
         if (!onACallNow())
             throw new IllegalStateException("no call connected, cannot send chars");
@@ -397,11 +504,20 @@ public class SipClient implements SipListener, ConnectivityReceiver.IPChangeList
         }
     }
 
+    /**
+     * tell the SipClient to register with the SIP server, given the credentials it currently has
+     * on hand.
+     */
     public void register() throws SipException {
         doRegister(DEFAULT_REGISTRATION_LEN, null);
     }
 
-    private void doRegister(int registrationLength, Header extraHeader) throws SipException {
+    /**
+     * The actual logic of registering, which can be called internally
+     * @param registrationLength the time in seconds to request registration with the server
+     * @param extraHeader another header to add to the REGISTER request, if desired
+     */
+    private void doRegister(int registrationLength, Header extraHeader) throws SipException  {
         int tag = randomGen.nextInt();
         URI requestURI = globalSipAddress.getURI();
 
@@ -460,6 +576,9 @@ public class SipClient implements SipListener, ConnectivityReceiver.IPChangeList
         return viaHeaders;
     }
 
+    /**
+     * Tell the SipClient to remove its registration with the server, e.g. if the app is quitting
+     */
     public void unregister() throws SipException {
         try {
             Log.d(TAG, "re-registering for time 0");
@@ -470,6 +589,9 @@ public class SipClient implements SipListener, ConnectivityReceiver.IPChangeList
         }
     }
 
+    /**
+     * In case close() is not called properly by the rest of the app
+     */
     @Override
     public void finalize() {
         close();
@@ -497,6 +619,16 @@ public class SipClient implements SipListener, ConnectivityReceiver.IPChangeList
         }*/
     }
 
+    /**
+     * Initiate a new call to the given SIP URI.
+     * @param URI the other party's SIP address
+     * @throws SipException if the request couldn't be sent for some other reason
+     * @throws ParseException if the URI can't be parsed, or the contact's server is not valid
+     * @throws TransactionUnavailableException if already on a call, or if another error occurs
+     * @throws InterruptedException
+     * @throws ExecutionException
+     * @throws InvalidArgumentException
+     */
     public void call(String URI) throws SipException, ParseException, TransactionUnavailableException, InterruptedException, ExecutionException, InvalidArgumentException {
         boolean available = callLock.tryAcquire();
         if (!available)
@@ -563,7 +695,10 @@ public class SipClient implements SipListener, ConnectivityReceiver.IPChangeList
     }
 
 
-    // SipProvider
+    /**
+     * SipListener interface callback.
+     * This method dispatches the incoming request to a helper depending on the SIP method
+     */
     @Override
     public void processRequest(RequestEvent requestEvent) {
         Request request = requestEvent.getRequest();
@@ -581,26 +716,8 @@ public class SipClient implements SipListener, ConnectivityReceiver.IPChangeList
                 receiveCall(requestEvent);
                 break;
             case Request.ACK:
-                if (currentCall != null && currentCall.isRinging()) {
-                    Request originalInvite = currentCall.getCreationEvent().getRequest();
-                    int suggestedT140Map = SDPBuilder.getT140MapNum(originalInvite, SDPBuilder.mediaType.T140);
-                    int suggestedT140RedMap = SDPBuilder.getT140MapNum(originalInvite, SDPBuilder.mediaType.T140RED);
-                    try {
-                        currentCall.accept(SDPBuilder.getRemoteIP(originalInvite), SDPBuilder.getT140PortNum(originalInvite), port+1, suggestedT140Map, suggestedT140RedMap);
-                        currentCall.addDialog(requestEvent.getDialog());
-                        synchronized (this) {
-                            try {
-                                wait(1000);
-                            } catch (InterruptedException e) {}
-                        }
-                        currentCall.resetMessageReceivers(messageReceivers);
-                        notifySessionEstablished();
-                    } catch (RtpException e) {
-                        Log.d(TAG, "call failed");
-                        currentCall = null;
-                        notifySessionFailed("couldn't establish RTP session");
-                    }
-                }
+                if (currentCall != null && currentCall.isRinging())
+                    beginCall(requestEvent);
                 else
                     Log.e(TAG, "stray ACK, what do I do? In response to a 488?");
                 break;
@@ -613,6 +730,34 @@ public class SipClient implements SipListener, ConnectivityReceiver.IPChangeList
             default:
                 Log.d(TAG, "Not implemented yet");
                 break;
+        }
+    }
+
+    /**
+     * Tell the other layers that the incoming call is now connected, thanks to receiving the ACK
+     *
+     * See the class description above for a detailed explanation of the incoming call sequence,
+     * including this weird lock handling.
+     * @param requestEvent the ACK event
+     */
+    private void beginCall(RequestEvent requestEvent) {
+        Request originalInvite = currentCall.getCreationEvent().getRequest();
+        int suggestedT140Map = SDPBuilder.getT140MapNum(originalInvite, SDPBuilder.mediaType.T140);
+        int suggestedT140RedMap = SDPBuilder.getT140MapNum(originalInvite, SDPBuilder.mediaType.T140RED);
+        try {
+            currentCall.accept(SDPBuilder.getRemoteIP(originalInvite), SDPBuilder.getT140PortNum(originalInvite), port+1, suggestedT140Map, suggestedT140RedMap);
+            currentCall.addDialog(requestEvent.getDialog());
+            synchronized (this) {
+                try {
+                    wait(1000); // wait for addTextReceiver() since a new UI Activity is spawning
+                } catch (InterruptedException e) {}
+            }
+            currentCall.resetMessageReceivers(messageReceivers);
+            notifySessionEstablished();
+        } catch (RtpException e) {
+            Log.d(TAG, "call failed");
+            currentCall = null;
+            notifySessionFailed("couldn't establish RTP session");
         }
     }
 
@@ -648,6 +793,8 @@ public class SipClient implements SipListener, ConnectivityReceiver.IPChangeList
     }
 
     /**
+     * This is a public method for an upper layer class to notify the SipClient that it wants to end
+     * the call.
      * Precondition: currently connected on or creating a call
      */
     public void hangUp() {
@@ -666,12 +813,16 @@ public class SipClient implements SipListener, ConnectivityReceiver.IPChangeList
     }
 
     /**
+     * The CallReceiver (likely on an upper layer) <em>must</em> call either this or declineCall()
+     * when an incoming call is ringing. This begins the call.
      * Precondition: a CallReceiver has been notified that a call is coming in
      * @throws IllegalStateException if there is no call waiting to be accepted (possibly because it already hung up),
      *      or if we are otherwise not in the midst of setting up a new call
      */
     /*  Precondition: callLock is locked, and currentCall has a copy of the incoming request event.
-        If a call is truly coming in, these will be satisfied.
+     *  If a call is truly coming in, these will be satisfied.
+     * See the class description above for a detailed explanation of the incoming call sequence,
+     * including this weird lock handling.
      */
     public void acceptCall() throws IllegalStateException {
         if (!onACallNow())
@@ -715,6 +866,13 @@ public class SipClient implements SipListener, ConnectivityReceiver.IPChangeList
     /*  Precondition: callLock is locked, and currentCall has a copy of the incoming request event.
         If a call is truly coming in, these will be satisfied.
      */
+
+    /**
+     * The CallReceiver (likely on an upper layer) <em>must</em> call either this or acceptCall()
+     * when an incoming call is ringing. This ignores the call.
+     * @throws IllegalStateException if there is no call waiting to be accepted (possibly because it already hung up),
+     *      or if we are otherwise not in the midst of setting up a new call
+     */
     public void declineCall() throws IllegalStateException {
         if (!onACallNow())
             throw new IllegalStateException("no call to decline");
@@ -734,6 +892,13 @@ public class SipClient implements SipListener, ConnectivityReceiver.IPChangeList
         if (BuildConfig.DEBUG) Log.d(TAG, "154254124512 should be 1:" + callLock.availablePermits());
     }
 
+    /**
+     * Handle an incoming INVITE request and create a new call if one is not ongoing.
+     *
+     * See the class description above for a detailed explanation of the incoming call sequence,
+     * including this weird lock handling.
+     * @param requestEvent the INVITE event
+     */
     private void receiveCall(RequestEvent requestEvent) {
         boolean lockAvailable = callLock.tryAcquire();
         if (lockAvailable && !onACallNow()) {
@@ -848,15 +1013,18 @@ public class SipClient implements SipListener, ConnectivityReceiver.IPChangeList
      * @param requestEvent a BYE request we have just received
      */
     private void endCall(RequestEvent requestEvent) {
-        // TODO make sure this is actually appropriate and not stray!
+        // TODO make sure this is actually appropriate/for us and not a random stray request!
 
-        // TODO do I need to do anything else to tear down the session? maybe close the RTP streams once I have them
         Request request = requestEvent.getRequest();
         respondGeneric(requestEvent, null, Response.OK);
         notifySessionClosed();
         terminateCall();
     }
 
+    /**
+     * This method handles the nitty-gritty of ending a call in progress, no matter how the decision
+     * was made to do so (BYE, user hanging up, etc).
+     */
     private void terminateCall() {
         callLock.acquireUninterruptibly();
         if (onACallNow()) {
@@ -869,6 +1037,10 @@ public class SipClient implements SipListener, ConnectivityReceiver.IPChangeList
         if (BuildConfig.DEBUG) Log.d(TAG, "2222222222 should be 1:" + callLock.availablePermits());
     }
 
+    /**
+     * SipListener interface callback.
+     * This dispatches the incoming SIP response to a helper depending on the response code
+     */
     @Override
     public void processResponse(ResponseEvent responseEvent) {
         Response response = responseEvent.getResponse();
@@ -892,6 +1064,7 @@ public class SipClient implements SipListener, ConnectivityReceiver.IPChangeList
     /* Precondition: if responseEvent is in response to an INVITE,
                      callLock was locked when initiating the call */
     private void handleFailure(ResponseEvent responseEvent) {
+        // TODO make sure this response is actually for us, and not some random stray thing!
         Response response = responseEvent.getResponse();
         if (response.getStatusCode() == Response.UNAUTHORIZED || response.getStatusCode() == Response.PROXY_AUTHENTICATION_REQUIRED) {
             handleChallenge(responseEvent);
@@ -1087,6 +1260,9 @@ public class SipClient implements SipListener, ConnectivityReceiver.IPChangeList
 
     }
 
+    /**
+     * RegistrationTimerTask interface callback
+     */
     public void registrationExpired() {
         try {
             register();
@@ -1096,6 +1272,9 @@ public class SipClient implements SipListener, ConnectivityReceiver.IPChangeList
         }
     }
 
+    /**
+     * SipListener interface callback
+     */
     @Override
     public void processTimeout(TimeoutEvent timeoutEvent) {
         // TODO: use timeoutEvent methods to find out the actual cause of this
@@ -1110,6 +1289,9 @@ public class SipClient implements SipListener, ConnectivityReceiver.IPChangeList
         }
     }
 
+    /**
+     * SipListener interface callback
+     */
     @Override
     public void processIOException(IOExceptionEvent ioExceptionEvent) {
        /* if (registrationPending) {
@@ -1123,18 +1305,26 @@ public class SipClient implements SipListener, ConnectivityReceiver.IPChangeList
         // not sure if i should actually do anything here, since there is NO WAY to tell what really caused this exception
     }
 
+    /**
+     * SipListener interface callback
+     */
     @Override
     public void processTransactionTerminated(TransactionTerminatedEvent transactionTerminatedEvent) {
         if (BuildConfig.DEBUG) Log.d(TAG, "received a TransactionTerminated message: " + transactionTerminatedEvent.toString());
     }
 
+    /**
+     * SipListener interface callback
+     */
     @Override
     public void processDialogTerminated(DialogTerminatedEvent dialogTerminatedEvent) {
         if (BuildConfig.DEBUG) Log.d(TAG, "received a DialogTerminated message");
         // TODO should I have used this to detect call ending? no, probably not
     }
 
-    // ConnectivityReceiver.IPChangeListener
+    /**
+     * ConnectivityReceiver.IPChangeListener interface callback
+     */
     @Override
     public void IPAddrChanged() {
         try {
