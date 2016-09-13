@@ -1,0 +1,15 @@
+<html>
+<body>
+The UI layer is the part the user sees and touches, the 5 different screens that each manage a
+different part of the registration/call process.
+
+<p>When opening the app, the first Activity run is FirstActivity, though
+it may or may not actually be visible, and may immediately launch the next one,
+RTTRegistrationActivity. The app stays there until the user either calls someone or receives a call.
+An incoming call launches IncomingCallActivity (this can happen when the app is not even in focus,
+or the phone is locked). The call itself takes place inside RTTCallActivity.
+
+<p>Errors and some other required interactions are displayed in several kinds of Dialogs (modal pop-up
+windows).
+</body>
+</html>

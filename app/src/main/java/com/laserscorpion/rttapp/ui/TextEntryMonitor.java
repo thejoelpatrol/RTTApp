@@ -13,22 +13,22 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 /**
- * The TextEntryMonitor, one of which is created by the RTTCallActivity at a time,
+ * <p>The TextEntryMonitor, one of which is created by the RTTCallActivity at a time,
  * listens for input on the user's text field (EditText), and keeps track of which
- * characters have changed. It sends those characters in the real-time call via the SipClient.
+ * characters have changed. It sends those characters in the real-time call via the SipClient.</p>
  *
- * There are two modes, real time and en bloc, specified in the constructor.
+ * <p>There are two modes, real time and en bloc, specified in the constructor.</p>
  *
- * Real-time mode:
+ * <p>Real-time mode:<br>
  * If text is added or deleted at the end, TextEntryMonitor tells the SipClient to send
  * the new characters (possibly '\b') in the real-time call. If edits are made earlier in the text,
  * it undoes them, since the user is not allowed to add or remove text anywhere besides the
  * end of the field. Keeping track of these edits is pretty annoying, and you need to understand how
- * the Android.text.TextWatcher interface works before touching any of this.
+ * the Android.text.TextWatcher interface works before touching any of this.</p>
  *
- * En bloc mode:
+ * <p>En bloc mode:<br>
  * Text is not sent character by character. It is only sent as complete messages, when checkAndSend()
- * is called.
+ * is called.</p>
  */
 public class TextEntryMonitor implements TextWatcher {
     private static final String TAG = "TextWatcher";

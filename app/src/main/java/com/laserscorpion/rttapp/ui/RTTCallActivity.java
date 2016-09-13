@@ -24,27 +24,27 @@ import com.laserscorpion.rttapp.sip.TextListener;
 import java.util.Date;
 
 /**
- * The screen for a call in progress.
+ * <p>The screen for a call in progress.</p>
  *
- * There are two call modes, selectable from Settings: real-time and en-bloc modes. In real-time
+ * <p>There are two call modes, selectable from Settings: real-time and en-bloc modes. In real-time
  * mode, chars are sent as they are entered. There is no notion of messages and no need for a "Send"
  * button. In en-bloc mode, chars are only sent in bunches when Send is pressed. The Send button is
  * only visible in en-bloc mode, and touching it calls sendText(), which is not used otherwise. In
  * both modes, outgoing text sending is handled by a helper, TextEntryMonitor. That class watches
  * the EditText in this activity for changes, and determines which characters to send via the
- * SipClient.
+ * SipClient.</p>
  *
- * This screen contains three TextViews, one of which is an EditText where the user enters their
+ * <p>This screen contains three TextViews, one of which is an EditText where the user enters their
  * own text. The largest TextView contains the incoming text, which is added in
  * addText(), called from RTTextReceived(). Adding text to the display fields is kind of a hassle
- * due to the need to run it on the UI thread. Android is rude enough to make us worry about this.
+ * due to the need to run it on the UI thread. Android is rude enough to make us worry about this.</p>
  *
- * A third, smaller TextView (R.id.control_messages) shows the call progress (Dialing, ringing,
+ * <p>A third, smaller TextView (R.id.control_messages) shows the call progress (Dialing, ringing,
  * connected, etc). There is probably a slicker way to display that information, like some icon that
  * changes state, or even a label whose entire text changes, rather than adding new lines to this
- * TextView.
+ * TextView.</p>
  *
- * Incoming text must be scrubbed of 0xFFEF Unicode chars to maintain an accurate view of how many
+ * <p>Incoming text must be scrubbed of 0xFFEF Unicode chars to maintain an accurate view of how many
  * characters are in the incoming text field. When editing CharSequences, for example when getting a
  * subsequence that chops off the end, invisible 0xFFEF characters may remain, which count as
  * characters but to a human are not really characters. We need to remove these if they ever occur,
@@ -52,15 +52,15 @@ import java.util.Date;
  * likely be sent in the actual incoming text. If they are, I suppose there could be a bug here, but
  * it probably won't have any effect. We don't want them in the other party's displayed text field
  * because when a backspace char comes in, we need to delete one char, and it should be a real
- * visible one, not a fake invisible one.
+ * visible one, not a fake invisible one.</p>
  *
- * Text of the call may be saved at any time via the "Save Text" button, or at the end of the call
- * from an option in the dialog that pops up.
+ * <p>Text of the call may be saved at any time via the "Save Text" button, or at the end of the call
+ * from an option in the dialog that pops up.</p>
  *
- * The activity is discarded when a dialog callback indicates to the activity that the end-call
+ * <p>The activity is discarded when a dialog callback indicates to the activity that the end-call
  * dialog has been dismissed. Various kinds of dialogs may be displayed depending on what caused
  * them (error, hanging up, etc), but all of them call a method of the activity to let it know that
- * the dialog is done and the activity may be destroyed.
+ * the dialog is done and the activity may be destroyed.</p>
  */
 public class RTTCallActivity extends AppCompatActivity implements TextListener,
                                                                     SessionListener,
